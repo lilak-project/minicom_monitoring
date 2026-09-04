@@ -1,0 +1,201 @@
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Alert, Badge, Button, Code, Group, Paper, Stack, Text } from "@mantine/core"
+import { AlertTriangle, Plug, Power } from "lucide-react"
+
+import { ChartCard } from "@/components/chart/chart-card"
+import { useTimeRange } from "@/components/chart/use-time-range"
+import { ConsolePanel } from "@/components/console-panel"
+import { RecordingBar } from "@/components/recording-bar"
+import { Fact, FactGrid } from "@/components/section"
+import { useSeries } from "@/hooks/use-series"
+import { now as serverNow } from "@/lib/clock"
+import { describeHolder, formatChannel, formatCount } from "@/lib/format"
+import { formatAgo, formatDuration } from "@/lib/time"
+import type { ChannelKey, ChannelSpec, SourceSnapshot } from "@/lib/types"
+
+/**
+ * One console: what it is reading now, over the window you choose, and the
+ * raw text underneath.
+ *
+ * The two halves answer different questions and both are needed. The chart
+ * says what the rate has been doing; the console says why. A run that dropped
+ * to zero looks the same on the plot whether the board crashed, the trigger
+ * was disabled, or the cable came out -- and the line that says which is
+ * always in the text.
+ */
+export function SourcePanel({
+  source,
+  channels,
+  onConnect,
+  onDisconnect,
+  onChanged,
+  busy,
+}: {
+  source: SourceSnapshot
+  channels: ChannelSpec[]
+  onConnect: () => void
+  onDisconnect: () => void
+  /** Something a button did needs to land before the next status frame. */
+  onChanged: () => void
+  busy: boolean
+}) {
+  const [channelKey, setChannelKey] = useState<ChannelKey>("intr_per_s")
+
+  const reading = source.status === "reading"
+  const live = source.channels.find((channel) => channel.key === channelKey)
+  const first = source.channels[0]
+
+  const range = useTimeRange(first?.first_at ?? null, null)
+  const { channel, loading, error, push } = useSeries(source.id, channelKey, range.window, {
+    follow: range.follow,
+  })
+
+  // Everything arriving on the status socket goes straight onto the end of the
+  // trace, so the chart moves at the rate the board prints rather than at the
+  // rate the window is refetched.
+  const pushedRef = useRef<number>(0)
+  useEffect(() => {
+    if (live?.at == null || live.value == null) return
+    if (live.at <= pushedRef.current) return
+    pushedRef.current = live.at
+    push(live.at, live.value)
+  }, [live?.at, live?.value, push])
+
+  // A different console, or a different quantity, is a different trace.
+  useEffect(() => {
+    pushedRef.current = 0
+  }, [source.id, channelKey])
+
+  const spec = channels.find((item) => item.key === channelKey)
+  const meanChannel = source.channels.find((item) => item.key === "intr_per_s")
+  const exportName = useMemo(() => `${source.name}_${channelKey}`, [source.name, channelKey])
+
+  return (
+    <Stack gap="lg">
+      <Paper withBorder p="lg" radius="lg">
+        <Stack gap="md">
+          <Group justify="space-between" align="flex-start" wrap="wrap" gap="sm">
+            <Group gap="sm" wrap="wrap">
+              <Text fw={600} size="xl">
+                {source.name}
+              </Text>
+              <Badge
+                size="lg"
+                radius="sm"
+                variant="light"
+                color={source.status === "error" ? "red" : reading ? "teal" : "gray"}
+              >
+                {source.status === "error" ? "error" : reading ? "reading" : "not open"}
+              </Badge>
+              <Badge size="lg" radius="sm" variant="default" className="tabular">
+                {source.kind === "serial" ? `${source.port} · ${source.baud} 8N1` : source.path}
+              </Badge>
+              {source.run_time ? (
+                <Badge size="lg" radius="sm" variant="default">
+                  run: {source.run_time}
+                </Badge>
+              ) : null}
+            </Group>
+            {reading ? (
+              <Button
+                variant="default"
+                leftSection={<Power size={16} />}
+                loading={busy}
+                onClick={onDisconnect}
+              >
+                Close
+              </Button>
+            ) : (
+              <Button leftSection={<Plug size={16} />} loading={busy} onClick={onConnect}>
+                Open
+              </Button>
+            )}
+          </Group>
+
+          {source.last_error ? (
+            <Alert color="red" icon={<AlertTriangle size={18} />} title="The reader stopped">
+              {source.last_error}
+            </Alert>
+          ) : null}
+
+          {source.unparsed > 0 ? (
+            <Alert
+              color="yellow"
+              icon={<AlertTriangle size={18} />}
+              title={`${formatCount(source.unparsed)} rate lines could not be read`}
+            >
+              The board printed something shaped like a rate line that this service does not
+              know how to parse, so those lines are on the console below and in no chart or
+              CSV. The last one was:
+              <Code block mt="xs">
+                {source.last_unparsed}
+              </Code>
+            </Alert>
+          ) : null}
+
+          {source.kind === "serial" && source.held_by.length > 0 && !reading ? (
+            <Alert color="yellow" variant="light" icon={<AlertTriangle size={18} />}>
+              {source.port} is open by {source.held_by.map(describeHolder).join(", ")}. Two
+              readers on one tty split the byte stream and both lose lines, so this will not
+              open until that stops. If that is minicom and you want to leave it running,
+              restart it with <code>-C {source.name.replace(/[^A-Za-z0-9_-]+/g, "_")}.cap</code>{" "}
+              and add the same console here as a capture file instead.
+            </Alert>
+          ) : null}
+
+          <FactGrid>
+            <Fact label="Average since opened">
+              {meanChannel && source.session_mean != null
+                ? `${formatChannel("intr_per_s", source.session_mean)} intr/s over ${formatCount(source.samples)} rate lines`
+                : "no rate lines yet"}
+            </Fact>
+            <Fact label="Last rate line">
+              {source.last_sample_at ? formatAgo(source.last_sample_at) : "never"}
+            </Fact>
+            <Fact label="Console lines">
+              {formatCount(source.lines)} seen, {formatCount(source.samples)} of them rate lines
+              {source.unparsed > 0 ? `, ${formatCount(source.unparsed)} unreadable` : ""}
+            </Fact>
+            <Fact label="Runs seen">
+              {source.runs === 0
+                ? "none"
+                : `${source.runs} — the board's trigger count restarting is what marks one`}
+            </Fact>
+            <Fact label="Open for">
+              {source.opened_at ? formatDuration(serverNow() - source.opened_at) : "—"}
+            </Fact>
+            <Fact label="Recording">
+              {source.recording
+                ? `run ${source.recording.run} — ${formatCount(source.recording.rows)} rate lines so far`
+                : "no — the chart is live, but nothing is being written to a file"}
+            </Fact>
+          </FactGrid>
+        </Stack>
+      </Paper>
+
+      <RecordingBar source={source} onChanged={onChanged} />
+
+      <ChartCard
+        channel={channel}
+        channels={channels}
+        channelKey={channelKey}
+        onChannelKey={setChannelKey}
+        current={live?.value ?? null}
+        range={range}
+        loading={loading}
+        error={error}
+        dataStart={first?.first_at ?? null}
+        dataEnd={null}
+        exportName={exportName}
+      />
+
+      {spec ? (
+        <Text size="sm" c="dimmed">
+          {spec.label} — {spec.description}
+        </Text>
+      ) : null}
+
+      <ConsolePanel sourceId={source.id} name={source.origin} />
+    </Stack>
+  )
+}

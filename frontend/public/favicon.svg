@@ -1,0 +1,11 @@
+<!-- A console prompt with a rate trace running off it: what this service is,
+     in the two marks that fit at 16 px. Indigo, not the blue of the vacuum
+     panel, so the two tabs are told apart before either title is readable. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#4a3aa7"/>
+  <path d="M6 10 L11 15.5 L6 21" fill="none" stroke="#fff" stroke-width="2.6"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M14.5 21.5 L18 21.5 L20 12.5 L22.5 19 L24.5 16 L27 16"
+        fill="none" stroke="#c5b9ff" stroke-width="2.4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

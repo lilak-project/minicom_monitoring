@@ -1,0 +1,6 @@
+fastapi>=0.115
+uvicorn[standard]>=0.32
+# Optional: only used to put a name and a USB id beside each port in the
+# Sources tab. Without it the ports are found by globbing /dev and reading
+# /sys, which is enough to open one.
+pyserial>=3.5
