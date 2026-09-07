@@ -2,7 +2,8 @@
 
     {"ok": true, "items": [{"label", "value", "unit", "state", "sub"}]}
 
-now / mean intr/s and whether the capture is connected. When nothing is being
+now / mean intr/s, an hour of trigger rate behind the number, and whether the
+capture is connected. When nothing is being
 read right now (minicom closed, no capture, service just restarted) the LAST
 values are shown instead of dashes -- taken from the newest CSV log this
 service wrote -- marked with when they were taken. Never touches the serial
@@ -24,6 +25,33 @@ from ..monitor import monitor
 router = APIRouter(tags=["live"])
 
 _TAIL_BYTES = 64 * 1024
+
+#: How much of the past the sparkline shows, with how many points, and how
+#: often it is recomputed however fast the wall polls.
+SPARK_WINDOW_SEC = 3600.0
+SPARK_POINTS = 60
+SPARK_TTL = 15.0
+_spark_cache: dict[str, tuple[float, list[float]]] = {}
+
+
+def _spark(source_id: str) -> list[float]:
+    """The last hour of trigger rate for one source, from the ring buffer."""
+    held = _spark_cache.get(source_id)
+    now = time.monotonic()
+    if held is not None and now - held[0] < SPARK_TTL:
+        return held[1]
+    values: list[float] = []
+    try:
+        source = next((s for s in monitor.sources() if s.spec.id == source_id), None)
+        if source is not None:
+            series = source.series(["intr_per_s"], time.time() - SPARK_WINDOW_SEC, None, SPARK_POINTS)
+            values = [float(v) for v in (series[0]["v"] if series else []) if v is not None]
+    except Exception:                      # a source with no buffer yet
+        values = []
+    if len(values) < 2:
+        values = []
+    _spark_cache[source_id] = (now, values)
+    return values
 
 
 def _last_from_csv() -> dict | None:
@@ -95,8 +123,10 @@ def live() -> dict:
                 if mean is None:
                     mean = logged["mean"]
                 sub_now = f"last {_when(logged['at'])}"
+        spark = _spark(s.get("id") or "")
         items.append({"label": "now", "value": "—" if now is None else f"{float(now):.0f}", "unit": "intr/s",
-                      "state": "running" if (connected and fresh) else "off", "sub": sub_now})
+                      "state": "running" if (connected and fresh) else "off", "sub": sub_now,
+                      "spark": spark, "spark_window": "1 h"})
         items.append({"label": "mean", "value": "—" if mean is None else f"{float(mean):.0f}", "unit": "intr/s", "state": ""})
         items.append({"label": "link", "value": "on" if connected else "off", "unit": "", "state": "ok" if connected else "down",
                       "sub": (s.get("last_error") or "")[:40]})
