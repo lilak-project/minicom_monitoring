@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef } from "react"
 import type uPlot from "uplot"
 
 import { formatChannel, formatTick } from "@/lib/format"
-import { AXIS_COLOR, GRID_COLOR, seriesColor, TICK_COLOR } from "@/lib/palette"
+import { useTheme } from "@neon"
+import { axisColor, chartFont, gridColor, seriesColor, surfaceColor, tickColor } from "@/lib/palette"
 import { formatClock } from "@/lib/time"
 import type { SeriesChannel } from "@/lib/types"
 
@@ -11,11 +12,9 @@ import type { TimeWindow } from "./use-time-range"
 import { UplotChart } from "./uplot-react"
 import { zoomPlugin } from "./zoom-plugin"
 
-const FONT = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 
 /** The mean is drawn, not just written: grey and dashed, so it reads as a
  *  reference rather than as a fifth measurement. */
-const MEAN_COLOR = "#495057"
 
 /** How a time tick is written depends on how much of the axis it has to place.
  *
@@ -104,6 +103,8 @@ export function RateChart({
 
   const unit = channels[0]?.unit ?? ""
   const key = channels[0]?.key
+  // Canvas colours are read when the chart is built, so a theme change rebuilds it.
+  const theme = useTheme()
   // Everything uPlot cannot be told after it is built. The mean's *value*
   // changes with every window and must not be in here -- only whether there
   // is one, which changes how many series the plot has.
@@ -113,8 +114,9 @@ export function RateChart({
         zeroFloor ? "zero" : "auto",
         showMean ? "mean" : "no-mean",
         channels.map((channel) => `${channel.key}/${channel.unit}`).join("|"),
+        theme,
       ].join("~"),
-    [zeroFloor, showMean, channels],
+    [zeroFloor, showMean, channels, theme],
   )
 
   const options = useMemo<Omit<uPlot.Options, "width" | "height">>(
@@ -142,21 +144,21 @@ export function RateChart({
       },
       axes: [
         {
-          stroke: AXIS_COLOR,
-          font: FONT,
-          grid: { stroke: GRID_COLOR, width: 1 },
-          ticks: { stroke: TICK_COLOR, width: 1, size: 5 },
+          stroke: axisColor(),
+          font: chartFont(),
+          grid: { stroke: gridColor(), width: 1 },
+          ticks: { stroke: tickColor(), width: 1, size: 5 },
           values: (_self: uPlot, splits: number[]) => splits.map(timeTicks(spanRef.current)),
         },
         {
           scale: "y",
           label: unit,
-          labelFont: FONT,
-          stroke: AXIS_COLOR,
-          font: FONT,
+          labelFont: chartFont(),
+          stroke: axisColor(),
+          font: chartFont(),
           size: 68,
-          grid: { stroke: GRID_COLOR, width: 1 },
-          ticks: { stroke: TICK_COLOR, width: 1, size: 5 },
+          grid: { stroke: gridColor(), width: 1 },
+          ticks: { stroke: tickColor(), width: 1, size: 5 },
           values: (_self: uPlot, splits: number[]) => splits.map(formatTick),
         },
       ],
@@ -177,7 +179,7 @@ export function RateChart({
             // marking; the ring in the surface colour keeps them legible.
             size: 8,
             width: 2,
-            stroke: "#ffffff",
+            stroke: surfaceColor(),
             fill: seriesColor(channel.index),
           },
           value: (_self: uPlot, value: number | null) =>
@@ -188,7 +190,7 @@ export function RateChart({
               {
                 label: "Mean",
                 scale: "y",
-                stroke: MEAN_COLOR,
+                stroke: axisColor(),
                 width: 1.5,
                 dash: [6, 4],
                 points: { show: false },
@@ -202,7 +204,9 @@ export function RateChart({
       ],
       plugins: [zoomPlugin({ onRange, onReset })],
     }),
-    [channels, unit, key, zeroFloor, showMean, onRange, onReset],
+    // theme: the canvas colours are read when the options are built.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [channels, unit, key, zeroFloor, showMean, onRange, onReset, theme],
   )
 
   // The window is owned outside the chart, so it is pushed in rather than

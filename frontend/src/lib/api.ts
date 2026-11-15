@@ -1,6 +1,7 @@
 import { url } from "@/lib/portal-base"
 
 import type {
+  Me,
   ConsoleResponse,
   LogList,
   Reference,
@@ -75,6 +76,9 @@ function windowSearch(query: WindowQuery): string {
 }
 
 export const api = {
+  /** Who is looking, and whether they may control. */
+  me: () => request<Me>("/api/me"),
+
   /** Static: answers with nothing connected, so the page explains itself. */
   reference: () => request<Reference>("/api/reference"),
 

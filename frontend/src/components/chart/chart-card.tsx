@@ -1,20 +1,18 @@
 import { useMemo, useRef } from "react"
 import {
-  Alert,
   Badge,
   Divider,
   Group,
   Loader,
   Paper,
-  SegmentedControl,
   Stack,
   Text,
   Tooltip,
 } from "@mantine/core"
-import { AlertTriangle, Download, ImageDown } from "lucide-react"
+import { Download, ImageDown } from "lucide-react"
 import type uPlot from "uplot"
 
-import { Readout } from "@/components/readout"
+import { Choice, Hold, Readout } from "@neon"
 import { downloadChartPng, downloadWindowCsv, stampedName } from "@/lib/download"
 import { formatChannel, formatCount } from "@/lib/format"
 import { seriesColor } from "@/lib/palette"
@@ -27,6 +25,9 @@ import { RangeControls } from "./range-controls"
 import { RateChart } from "./rate-chart"
 import { TimeBounds } from "./time-bounds"
 import type { TimeRangeControl } from "./use-time-range"
+
+/** The widest each channel's reading gets, as formatChannel writes it (rule 5). */
+const widest = (key: ChannelKey) => (key === "total_intr" ? "888,888,888" : key === "mem_pct" ? "88.88" : "88,888")
 
 /**
  * The chart, the numbers that summarise it, and a footer saying what is drawn.
@@ -85,11 +86,10 @@ export function ChartCard({
     <Paper withBorder p="lg" radius="lg">
       <Stack gap="md">
         <Group justify="space-between" align="flex-start" wrap="wrap" gap="sm">
-          <SegmentedControl
-            size="sm"
+          <Choice
             value={channelKey}
-            onChange={(value) => onChannelKey(value as ChannelKey)}
-            data={channels.map((item) => ({ value: item.key, label: item.label }))}
+            onChange={onChannelKey}
+            options={channels.map((item) => ({ value: item.key, label: item.label }))}
           />
           <Group gap="xs">
             <Tooltip label="Save the window on screen as a CSV">
@@ -125,71 +125,74 @@ export function ChartCard({
 
         {/* Current first, then the average -- the two numbers somebody came
             to this page for, in the order they ask for them. */}
+        {/* Each number holds the room of its widest (NEON rule 5). The mean is
+            in the trace's dim colour, as the dashed line it is drawn as. */}
         <Group gap="xl" wrap="wrap">
           <Readout
-            label="Now"
+            label={<><span className="mc-swatch" style={{ background: seriesColor(spec?.index ?? 0) }} />Now</>}
             size="hero"
-            value={formatChannel(channelKey, current)}
+            value={<Hold reserve={[widest(channelKey)]}>{formatChannel(channelKey, current)}</Hold>}
             unit={unit}
-            color={seriesColor(spec?.index ?? 0)}
           />
           <Readout
-            label="Mean over the window"
+            label={<><span className="mc-swatch dim" />Mean over the window</>}
             size="hero"
-            value={formatChannel(channelKey, stats?.mean)}
+            value={<Hold reserve={[widest(channelKey)]}>{formatChannel(channelKey, stats?.mean)}</Hold>}
             unit={unit}
-            color="#495057"
           />
           <Readout
             label="Spread (1σ)"
-            value={stats?.stdev == null ? "—" : `±${formatChannel(channelKey, stats.stdev)}`}
+            value={<Hold reserve={[`±${widest(channelKey)}`]}>{stats?.stdev == null ? "—" : `±${formatChannel(channelKey, stats.stdev)}`}</Hold>}
             unit={unit}
           />
-          <Readout label="Lowest" value={formatChannel(channelKey, stats?.min)} unit={unit} />
-          <Readout label="Highest" value={formatChannel(channelKey, stats?.max)} unit={unit} />
-          <Readout label="Samples in window" value={formatCount(stats?.count ?? 0)} />
+          <Readout label="Lowest" value={<Hold reserve={[widest(channelKey)]}>{formatChannel(channelKey, stats?.min)}</Hold>} unit={unit} />
+          <Readout label="Highest" value={<Hold reserve={[widest(channelKey)]}>{formatChannel(channelKey, stats?.max)}</Hold>} unit={unit} />
+          <Readout label="Samples in window" value={<Hold reserve={["88 888"]}>{formatCount(stats?.count ?? 0)}</Hold>} />
         </Group>
 
         {/* One row of controls, above the chart they scope. */}
         <RangeControls range={range} />
 
-        {error ? (
-          <Alert color="red" icon={<AlertTriangle size={18} />} title="Could not read the samples">
-            {error}
-          </Alert>
-        ) : null}
-
-        {empty && !loading ? (
-          <Stack gap={4} py="xl" align="center">
-            <Text c="dimmed" size="sm">
-              No rate lines in this window.
-            </Text>
-            <Text c="dimmed" size="xs">
-              {/* Said plainly, because the two reasons need different actions:
-                  a window from before the console was opened, or a board that
-                  is not printing -- which is not the same as a board that is
-                  idle, and the console below tells them apart. */}
-              Widen it or press All — or, if this console has only just been
-              opened, wait for the board's next rate line. The raw console
-              below shows whether anything is arriving at all.
-            </Text>
-          </Stack>
-        ) : (
-          <ChartBoundary>
-            <RateChart
-              channels={list}
-              window={range.window}
-              mean={stats?.mean ?? null}
-              zeroFloor={zeroFloor}
-              loading={loading}
-              onRange={range.setWindow}
-              onReset={range.reset}
-              onPlot={(plot) => {
-                plotRef.current = plot
-              }}
-            />
-          </ChartBoundary>
-        )}
+        {/* One slot, one height (rule 5): the chart, or why there is none, in
+            the same place -- a failed read laid over it, not pushed in above. */}
+        <div className="mc-chartslot">
+          {empty && !loading ? (
+            <div className="mc-chartempty">
+              <Text c="dimmed" size="sm">
+                No rate lines in this window.
+              </Text>
+              <Text c="dimmed" size="xs">
+                {/* Said plainly, because the two reasons need different actions:
+                    a window from before the console was opened, or a board that
+                    is not printing -- which is not the same as a board that is
+                    idle, and the console below tells them apart. */}
+                Widen it or press All — or, if this console has only just been
+                opened, wait for the board's next rate line. The raw console
+                below shows whether anything is arriving at all.
+              </Text>
+            </div>
+          ) : (
+            <ChartBoundary>
+              <RateChart
+                channels={list}
+                window={range.window}
+                mean={stats?.mean ?? null}
+                zeroFloor={zeroFloor}
+                loading={loading}
+                onRange={range.setWindow}
+                onReset={range.reset}
+                onPlot={(plot) => {
+                  plotRef.current = plot
+                }}
+              />
+            </ChartBoundary>
+          )}
+          {error ? (
+            <div className="mc-chartfail tone-text-alarm" role="alert">
+              ■ Could not read the samples: {error}
+            </div>
+          ) : null}
+        </div>
 
         <Group gap="lg" wrap="wrap">
           <Text size="xs" c="dimmed">
@@ -210,12 +213,13 @@ export function ChartCard({
               spike is still on the chart.
             </Text>
           ) : null}
-          {loading ? <Loader size="xs" /> : null}
+          {/* Always in the row, seen only while loading: nothing shifts. */}
+          <Loader size="xs" style={{ visibility: loading ? "visible" : "hidden" }} />
         </Group>
 
         <Text size="xs" c="dimmed">
-          Drag across the chart to zoom to that interval · wheel to zoom · shift-drag to pan ·
-          double-click to go back
+          Drag across the chart to zoom to that interval · shift-drag to pan · double-click
+          to go back · the wheel scrolls the page
         </Text>
 
         <Divider />

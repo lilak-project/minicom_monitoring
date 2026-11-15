@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Alert, Badge, Button, Code, Group, Paper, Stack, Text } from "@mantine/core"
-import { AlertTriangle, Plug, Power } from "lucide-react"
+import { Button, Code, Text } from "@mantine/core"
+import { NoticeLine, Panel, StateDot, Tag } from "@neon"
+import { Plug, Power } from "lucide-react"
 
 import { ChartCard } from "@/components/chart/chart-card"
 import { useTimeRange } from "@/components/chart/use-time-range"
@@ -25,6 +26,7 @@ import type { ChannelKey, ChannelSpec, SourceSnapshot } from "@/lib/types"
  */
 export function SourcePanel({
   source,
+  control,
   channels,
   onConnect,
   onDisconnect,
@@ -32,6 +34,8 @@ export function SourcePanel({
   busy,
 }: {
   source: SourceSnapshot
+  /** Monitoring draws nothing that opens, closes or records. */
+  control: boolean
   channels: ChannelSpec[]
   onConnect: () => void
   onDisconnect: () => void
@@ -70,78 +74,77 @@ export function SourcePanel({
   const meanChannel = source.channels.find((item) => item.key === "intr_per_s")
   const exportName = useMemo(() => `${source.name}_${channelKey}`, [source.name, channelKey])
 
+  // The three things that can be wrong with a console, worst first, on the
+  // one line that is always there (NEON rule 5).
+  const held = source.kind === "serial" && source.held_by.length > 0 && !reading
+  const problem = source.last_error
+    ? { tone: "alarm" as const, text: `The reader stopped: ${source.last_error}`, more: undefined }
+    : held
+      ? {
+          tone: "warn" as const,
+          text: `${source.port} is open by ${source.held_by.map(describeHolder).join(", ")}`,
+          more: (
+            <>
+              Two readers on one tty split the byte stream and both lose lines, so this will not
+              open until that stops. If that is minicom and you want to leave it running, restart
+              it with <code>-C {source.name.replace(/[^A-Za-z0-9_-]+/g, "_")}.cap</code> and add the
+              same console here as a capture file instead.
+            </>
+          ),
+        }
+      : source.unparsed > 0
+        ? {
+            tone: "warn" as const,
+            text: `${formatCount(source.unparsed)} rate lines could not be read`,
+            more: (
+              <>
+                The board printed something shaped like a rate line that this service does not know
+                how to parse, so those lines are on the console below and in no chart or CSV. The
+                last one was:
+                <Code block mt="xs">
+                  {source.last_unparsed}
+                </Code>
+              </>
+            ),
+          }
+        : null
+
   return (
-    <Stack gap="lg">
-      <Paper withBorder p="lg" radius="lg">
-        <Stack gap="md">
-          <Group justify="space-between" align="flex-start" wrap="wrap" gap="sm">
-            <Group gap="sm" wrap="wrap">
-              <Text fw={600} size="xl">
-                {source.name}
-              </Text>
-              <Badge
-                size="lg"
-                radius="sm"
-                variant="light"
-                color={source.status === "error" ? "red" : reading ? "teal" : "gray"}
-              >
-                {source.status === "error" ? "error" : reading ? "reading" : "not open"}
-              </Badge>
-              <Badge size="lg" radius="sm" variant="default" className="tabular">
-                {source.kind === "serial" ? `${source.port} · ${source.baud} 8N1` : source.path}
-              </Badge>
-              {source.run_time ? (
-                <Badge size="lg" radius="sm" variant="default">
-                  run: {source.run_time}
-                </Badge>
-              ) : null}
-            </Group>
-            {reading ? (
-              <Button
-                variant="default"
-                leftSection={<Power size={16} />}
-                loading={busy}
-                onClick={onDisconnect}
-              >
-                Close
-              </Button>
-            ) : (
-              <Button leftSection={<Plug size={16} />} loading={busy} onClick={onConnect}>
-                Open
-              </Button>
-            )}
-          </Group>
-
-          {source.last_error ? (
-            <Alert color="red" icon={<AlertTriangle size={18} />} title="The reader stopped">
-              {source.last_error}
-            </Alert>
-          ) : null}
-
-          {source.unparsed > 0 ? (
-            <Alert
-              color="yellow"
-              icon={<AlertTriangle size={18} />}
-              title={`${formatCount(source.unparsed)} rate lines could not be read`}
+    <div className="mc-stack">
+      <Panel
+        title={
+          // What the console IS -- where it is read from -- as a fixed tag (rule 4).
+          <span className="mc-tags">
+            {source.name}
+            <Tag label="FROM">{source.kind === "serial" ? `${source.port} · ${source.baud} 8N1` : source.path}</Tag>
+          </span>
+        }
+        actions={
+          <span className="mc-keys">
+            <StateDot
+              tone={source.status === "error" ? "alarm" : reading ? "ok" : "idle"}
+              reserve={["error", "reading", "not open"]}
             >
-              The board printed something shaped like a rate line that this service does not
-              know how to parse, so those lines are on the console below and in no chart or
-              CSV. The last one was:
-              <Code block mt="xs">
-                {source.last_unparsed}
-              </Code>
-            </Alert>
-          ) : null}
-
-          {source.kind === "serial" && source.held_by.length > 0 && !reading ? (
-            <Alert color="yellow" variant="light" icon={<AlertTriangle size={18} />}>
-              {source.port} is open by {source.held_by.map(describeHolder).join(", ")}. Two
-              readers on one tty split the byte stream and both lose lines, so this will not
-              open until that stops. If that is minicom and you want to leave it running,
-              restart it with <code>-C {source.name.replace(/[^A-Za-z0-9_-]+/g, "_")}.cap</code>{" "}
-              and add the same console here as a capture file instead.
-            </Alert>
-          ) : null}
+              {source.status === "error" ? "error" : reading ? "reading" : "not open"}
+            </StateDot>
+            {control ? (
+              reading ? (
+                <Button variant="default" leftSection={<Power size={16} />} loading={busy} onClick={onDisconnect}>
+                  Close
+                </Button>
+              ) : (
+                <Button variant="default" leftSection={<Plug size={16} />} loading={busy} onClick={onConnect}>
+                  Open
+                </Button>
+              )
+            ) : null}
+          </span>
+        }
+      >
+        <div className="mc-stack">
+          <NoticeLine tone={problem?.tone ?? null} more={problem?.more}>
+            {problem?.text ?? (reading ? "Reading the console" : "Not open")}
+          </NoticeLine>
 
           <FactGrid>
             <Fact label="Average since opened">
@@ -169,11 +172,12 @@ export function SourcePanel({
                 ? `run ${source.recording.run} — ${formatCount(source.recording.rows)} rate lines so far`
                 : "no — the chart is live, but nothing is being written to a file"}
             </Fact>
+            <Fact label="Board's run clock">{source.run_time || "—"}</Fact>
           </FactGrid>
-        </Stack>
-      </Paper>
+        </div>
+      </Panel>
 
-      <RecordingBar source={source} onChanged={onChanged} />
+      <RecordingBar source={source} control={control} onChanged={onChanged} />
 
       <ChartCard
         channel={channel}
@@ -196,6 +200,6 @@ export function SourcePanel({
       ) : null}
 
       <ConsolePanel sourceId={source.id} name={source.origin} />
-    </Stack>
+    </div>
   )
 }

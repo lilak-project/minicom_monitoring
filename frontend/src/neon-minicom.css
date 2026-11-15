@@ -1,0 +1,69 @@
+/* minicom on the DAQ look (neon_ui). The look itself -- tokens, parts, the
+   Mantine theme -- is neon_ui's; this file only lays out minicom's own pieces
+   on its tokens. */
+
+/* Readouts that update every second must not reflow as digits change. */
+.tabular { font-variant-numeric: tabular-nums; }
+
+.mc-stack { display: flex; flex-direction: column; gap: var(--neon-gap); }
+.mc-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 28px; }
+.mc-keys { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mc-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.mc-swatch { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; }
+.mc-swatch.dim { background: var(--neon-dim); }
+
+/* --- the chart ------------------------------------------------------- */
+.chart-host { width: 100%; }
+.chart-host .uplot { width: 100%; }
+.chart-host .u-axis, .chart-host .u-legend { font-family: inherit; color: var(--neon-text); }
+.chart-host .u-legend { font-size: var(--neon-fs-small); margin-top: 2px; }
+.chart-host .u-legend .u-marker { border-width: 3px; }
+.chart-host .u-legend .u-value { font-variant-numeric: tabular-nums; }
+.chart-host .u-select {
+  background: color-mix(in srgb, var(--neon-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--neon-accent) 50%, transparent);
+}
+.chart-host .u-cursor-x, .chart-host .u-cursor-y { border-color: var(--neon-dim); }
+.chart-tooltip {
+  position: absolute; z-index: 3; pointer-events: none;
+  background: var(--neon-raise); border: 1px solid var(--neon-line); color: var(--neon-text);
+  padding: 6px 10px; font-size: var(--neon-fs-small); white-space: nowrap;
+  transform: translate(12px, 12px);
+}
+/* The chart's slot: its height whether it draws or explains why not; a failed
+   read is laid over the top of it (NEON rule 5). */
+.mc-chartslot { position: relative; min-height: 340px; }
+.mc-chartempty { height: 340px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; }
+.mc-chartfail { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 4; padding: 8px 12px; background: var(--neon-raise); border-left: 3px solid currentColor; }
+
+/* A definition list of facts, two columns that stay aligned down the panel. */
+.fact-grid { display: grid; grid-template-columns: minmax(9rem, max-content) 1fr; gap: 6px 14px; align-items: baseline; margin: 0; }
+.fact-grid dt { color: var(--neon-dim); font-size: var(--neon-fs-small); }
+.fact-grid dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 47.99em) {
+  .fact-grid { grid-template-columns: 1fr; gap: 2px 14px; }
+  .fact-grid dd { margin-bottom: 8px; }
+}
+.mc-picked td { background: color-mix(in srgb, var(--neon-accent) 12%, transparent); }
+
+/* --- the console ------------------------------------------------------ */
+/* A fixed viewport onto the scrollback, not a page that grows without end:
+   the chart above it must stay on screen while the console is read. */
+.console-box {
+  height: 340px; overflow: auto; padding: 8px 4px;
+  background: var(--neon-console); color: var(--neon-console-text); border: 1px solid var(--neon-line);
+  font-family: var(--mantine-font-family-monospace); font-size: var(--neon-fs-small); line-height: 1.55;
+}
+.console-line { display: flex; gap: 10px; padding: 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* The line that becomes a point on the chart, marked so the connection
+   between the two halves of the page is visible rather than asserted. */
+.console-line.is-rate { background: color-mix(in srgb, var(--neon-accent) 10%, transparent); color: var(--neon-accent); }
+.console-time { flex: none; color: var(--neon-dim); font-variant-numeric: tabular-nums; }
+/* NEXT is a key: press it to edit the next run's label; it edits in place. */
+.mc-tagkey { all: unset; cursor: pointer; }
+.mc-tagkey:hover .neon-fixed { border-color: var(--neon-accent); }
+.mc-tagkey:focus-visible .neon-fixed { outline: 2px solid var(--neon-accent); outline-offset: 1px; }
+.mc-nextedit { display: inline-flex; align-items: center; gap: 6px; }
+.mc-nextedit .neon-input { width: 96px; height: 24px; padding: 0 6px; box-sizing: border-box; font-size: var(--neon-fs-small); }
+.mc-nextedit .neon-command { height: 24px; }
+.mc-recline { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--neon-fs-small); }

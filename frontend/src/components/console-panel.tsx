@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
-import { Alert, Badge, Button, Group, Paper, Stack, Switch, Text } from "@mantine/core"
-import { AlertTriangle, Terminal } from "lucide-react"
+import { Badge, Button, Group, Paper, Stack, Switch, Text } from "@mantine/core"
+import { NoticeLine } from "@neon"
+import { Terminal } from "lucide-react"
 
 import { useConsole } from "@/hooks/use-console"
 import { formatClock } from "@/lib/time"
@@ -42,7 +43,7 @@ export function ConsolePanel({ sourceId, name }: { sourceId: string; name: strin
   }
 
   return (
-    <Paper withBorder p="lg" radius="lg">
+    <Paper withBorder p="lg">
       <Stack gap="sm">
         <Group justify="space-between" wrap="wrap" gap="sm">
           <Group gap="xs">
@@ -71,18 +72,18 @@ export function ConsolePanel({ sourceId, name }: { sourceId: string; name: strin
           </Group>
         </Group>
 
-        {error ? (
-          <Alert color="red" icon={<AlertTriangle size={18} />} title="Could not read the console">
-            {error}
-          </Alert>
-        ) : null}
-
-        {gap ? (
-          <Alert color="yellow" variant="light" icon={<AlertTriangle size={16} />}>
-            The board printed faster than this page could fetch, so some lines are missing
-            here. None are missing from the CSV — that is written where the lines arrive.
-          </Alert>
-        ) : null}
+        {/* Always there (NEON rule 5): a failed read, or lines lost between
+            fetches, fill this line instead of pushing the scrollback down. */}
+        <NoticeLine
+          tone={error ? "alarm" : gap ? "warn" : null}
+          more={
+            !error && gap
+              ? "The board printed faster than this page could fetch, so some lines are missing here. None are missing from the CSV — that is written where the lines arrive."
+              : undefined
+          }
+        >
+          {error ? `Could not read the console: ${error}` : gap ? "Some lines are missing here (not from the CSV)" : "Every line is here"}
+        </NoticeLine>
 
         <div ref={boxRef} onScroll={onScroll} className="console-box">
           {lines.length === 0 ? (

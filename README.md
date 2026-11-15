@@ -12,6 +12,17 @@ cd frontend && npm install && npm run build && cd ..
 Also registered with the LILAK portal as **minicom**, which starts it on demand
 at `<portal>/p/minicom/`.
 
+## Control and monitoring
+
+Two modes. **Monitor** shows every console, its rate chart, the raw lines and
+the recorded runs; **Control** adds the Sources tab (add, edit consoles), Open
+and Close, and recording (Record, New run, Stop; NEXT sets the next run's
+label). Under the portal, control is for a portal manager or an admin of this
+service (a grant with admin ticked, to the person or a group); everyone else
+gets monitoring, and the server refuses their writes (`backend/app/access.py`,
+checked by `backend/tools/check_access.py`). Run alone, everything is allowed.
+The screens are drawn with the NEON kit (`../neon_ui`).
+
 ## What it is for
 
 A CoBo prints one periodic, quantitative line to its console:

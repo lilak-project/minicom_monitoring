@@ -1,5 +1,6 @@
 import { useState } from "react"
-import { Badge, Button, Group, Paper, Stack, Text, TextInput, Tooltip } from "@mantine/core"
+import { Button, Tooltip } from "@mantine/core"
+import { Command, Hold, Panel, Readout, StateDot, Tag } from "@neon"
 import { Circle, Square, StepForward } from "lucide-react"
 
 import { useAction } from "@/hooks/use-action"
@@ -24,9 +25,12 @@ import type { SourceSnapshot } from "@/lib/types"
  */
 export function RecordingBar({
   source,
+  control,
   onChanged,
 }: {
   source: SourceSnapshot
+  /** Monitoring shows the recording and nothing that starts or stops it. */
+  control: boolean
   onChanged: () => void
 }) {
   const [label, setLabel] = useState("")
@@ -58,112 +62,104 @@ export function RecordingBar({
     )
 
   const busy = pending === `rec:${source.id}`
+  /** The NEXT run's label being edited; null while it is shown as a tag. */
+  const [editing, setEditing] = useState<string | null>(null)
+  const nextRun = label.trim() || source.next_run
+  // Set: the typed label is the one the next run takes; Record or New run
+  // with the box still open counts as pressing Set first.
+  const settle = () => {
+    const chosen = editing === null ? label : editing.trim() === source.next_run ? "" : editing
+    setLabel(chosen)
+    setEditing(null)
+    return chosen
+  }
 
   return (
-    <Paper withBorder p="md" radius="md" bg={rec ? "red.0" : undefined}>
-      <Group justify="space-between" align="flex-end" wrap="wrap" gap="md">
-        <Stack gap={4} style={{ minWidth: 0 }}>
-          <Group gap="xs">
-            {rec ? (
+    <Panel
+      title={
+        // What the file is (fixed: its run) on the title line; what it is
+        // doing (rows, time, mean) in held numbers below (NEON rules 4, 5).
+        <span className="mc-tags">
+          Recording
+          {rec ? (
+            <Tag label="RUN" on>{rec.run}</Tag>
+          ) : control && open && editing !== null ? (
+            <span className="mc-nextedit">
+              <input
+                className="neon-input num"
+                autoFocus
+                value={editing}
+                onChange={(event) => setEditing(event.currentTarget.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") settle()
+                  if (event.key === "Escape") setEditing(null)
+                }}
+              />
+              <Command small onRun={() => void settle()}>
+                Set
+              </Command>
+            </span>
+          ) : control && open ? (
+            <button type="button" className="mc-tagkey" title="Change the next run's label" onClick={() => setEditing(nextRun)}>
+              <Tag label="NEXT">{nextRun}</Tag>
+            </button>
+          ) : (
+            <Tag label="NEXT">{nextRun}</Tag>
+          )}
+        </span>
+      }
+      actions={
+        <span className="mc-keys">
+          <StateDot tone={rec ? "ok" : "idle"} reserve={["recording", "not recording"]}>
+            {rec ? "recording" : "not recording"}
+          </StateDot>
+          {control ? (
+            rec ? (
               <>
-                {/* The one red thing on the page, and it means one thing. */}
-                <Circle size={12} fill="var(--mantine-color-red-7)" strokeWidth={0} className="rec-dot" />
-                <Text fw={600}>Recording run {rec.run}</Text>
-                <Badge size="sm" variant="default" className="tabular">
-                  {formatCount(rec.rows)} rate line{rec.rows === 1 ? "" : "s"}
-                </Badge>
-                <Badge size="sm" variant="default" className="tabular">
-                  {formatDuration(rec.seconds ?? 0)}
-                </Badge>
-                {rec.mean != null ? (
-                  <Badge size="sm" variant="default" className="tabular">
-                    mean {formatChannel("intr_per_s", rec.mean)} intr/s
-                  </Badge>
-                ) : null}
+                <Tooltip label={`Close run ${rec.run} and open run ${editing ?? nextRun}`}>
+                  <Button variant="default" leftSection={<StepForward size={15} />} loading={busy} onClick={() => start(settle())}>
+                    New run
+                  </Button>
+                </Tooltip>
+                <Button variant="default" leftSection={<Square size={13} fill="currentColor" />} loading={busy} onClick={stop}>
+                  Stop
+                </Button>
               </>
             ) : (
-              <>
-                <Circle size={12} strokeWidth={2} color="var(--mantine-color-gray-5)" />
-                <Text fw={600} c="dimmed">
-                  Not recording
-                </Text>
-                <Text size="sm" c="dimmed">
-                  the chart and the console below are live either way — nothing is being written
-                  to a file
-                </Text>
-              </>
-            )}
-          </Group>
-
-          {rec ? (
-            <Text size="xs" c="dimmed" className="tabular">
-              {rec.filename} · started {formatStamp(rec.started_at)}
-              {rec.rows === 0 ? " · the file is created on the first rate line" : ""}
-              {rec.appended ? " · adding to a file this run already had" : ""}
-              {rec.note ? ` · ${rec.note}` : ""}
-            </Text>
-          ) : null}
-        </Stack>
-
-        <Group gap="xs" align="flex-end">
-          <TextInput
-            size="sm"
-            w={116}
-            label="Run"
-            placeholder={source.next_run}
-            value={label}
-            disabled={!open}
-            onChange={(event) => setLabel(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && open && !busy) start(label)
-            }}
-          />
-          {rec ? (
-            <>
-              <Tooltip label={`Close run ${rec.run} and open run ${label.trim() || source.next_run}`}>
-                <Button
-                  size="sm"
-                  leftSection={<StepForward size={15} />}
-                  loading={busy}
-                  onClick={() => start(label)}
-                >
-                  New run
-                </Button>
+              <Tooltip label={open ? `Write to run ${editing ?? nextRun}` : "Open the console first — there is nothing to record"}>
+                <div>
+                  <Button
+                    variant="default"
+                    leftSection={<Circle size={12} fill="currentColor" strokeWidth={0} />}
+                    disabled={!open}
+                    loading={busy}
+                    onClick={() => start(settle())}
+                  >
+                    Record
+                  </Button>
+                </div>
               </Tooltip>
-              <Button
-                size="sm"
-                variant="default"
-                leftSection={<Square size={13} fill="currentColor" />}
-                loading={busy}
-                onClick={stop}
-              >
-                Stop
-              </Button>
-            </>
-          ) : (
-            <Tooltip
-              label={
-                open
-                  ? `Write to run ${label.trim() || source.next_run}`
-                  : "Open the console first — there is nothing to record"
-              }
-            >
-              <div>
-                <Button
-                  size="sm"
-                  color="red"
-                  leftSection={<Circle size={12} fill="currentColor" strokeWidth={0} />}
-                  disabled={!open}
-                  loading={busy}
-                  onClick={() => start(label)}
-                >
-                  Record
-                </Button>
-              </div>
-            </Tooltip>
-          )}
-        </Group>
-      </Group>
-    </Paper>
+            )
+          ) : null}
+        </span>
+      }
+    >
+      <div className="mc-row">
+        <Readout label="Rate lines" size="text" value={<Hold reserve={["8 888 888"]}>{rec ? formatCount(rec.rows) : "—"}</Hold>} />
+        <Readout label="For" size="text" value={<Hold reserve={["88.8 h"]}>{rec ? formatDuration(rec.seconds ?? 0) : "—"}</Hold>} />
+        <Readout
+          label="Mean"
+          size="text"
+          value={<Hold reserve={["8.888e+88"]}>{rec?.mean != null ? formatChannel("intr_per_s", rec.mean) : "—"}</Hold>}
+          unit="intr/s"
+        />
+      </div>
+      {/* One line either way (rule 5): which file, or that there is none. */}
+      <div className="faint mc-recline" title={rec?.filename}>
+        {rec
+          ? `${rec.filename} · started ${formatStamp(rec.started_at)}${rec.rows === 0 ? " · the file is created on the first rate line" : ""}${rec.appended ? " · adding to a file this run already had" : ""}${rec.note ? ` · ${rec.note}` : ""}`
+          : "The chart and the console below are live either way — nothing is being written to a file."}
+      </div>
+    </Panel>
   )
 }

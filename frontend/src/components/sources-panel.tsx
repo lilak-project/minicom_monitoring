@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useState } from "react"
 import {
   ActionIcon,
-  Alert,
   Badge,
   Button,
   Group,
   Paper,
-  SegmentedControl,
   Select,
   Stack,
   Switch,
@@ -14,13 +12,14 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core"
-import { AlertTriangle, Pencil, Plug, Plus, Power, RefreshCw, Trash2 } from "lucide-react"
+import { Pencil, Plug, Plus, Power, RefreshCw, Trash2 } from "lucide-react"
 
 import { Fact, FactGrid, Section } from "@/components/section"
 import { useAction } from "@/hooks/use-action"
 import { api } from "@/lib/api"
 import { describeHolder, formatCount } from "@/lib/format"
 import type { Reference, SerialPort, SourceKind, SourceSnapshot } from "@/lib/types"
+import { Choice, NoticeLine } from "@neon"
 
 /** A console being edited, before it is saved. */
 interface Draft {
@@ -237,11 +236,12 @@ export function SourcesPanel({
                 </Group>
               </Group>
 
-              {source.last_error ? (
-                <Alert mt="sm" color="red" variant="light" icon={<AlertTriangle size={16} />}>
-                  {source.last_error}
-                </Alert>
-              ) : null}
+              {/* One line per console, always there (rule 5). */}
+              <div style={{ marginTop: 10 }}>
+                <NoticeLine tone={source.last_error ? "alarm" : null}>
+                  {source.last_error || (source.status === "reading" ? "Reading" : "Not open")}
+                </NoticeLine>
+              </div>
             </Paper>
           ))
         )}
@@ -267,11 +267,13 @@ export function SourcesPanel({
       >
         <Paper withBorder p="md" radius="md">
           <Stack gap="md">
-            <SegmentedControl
-              value={draft.kind}
-              onChange={(value) => setDraft({ ...draft, kind: value as SourceKind })}
-              data={(reference?.kinds ?? []).map((kind) => ({ value: kind.id, label: kind.label }))}
-            />
+            <div>
+              <Choice
+                value={draft.kind}
+                onChange={(value) => setDraft({ ...draft, kind: value as SourceKind })}
+                options={(reference?.kinds ?? []).map((kind) => ({ value: kind.id, label: kind.label }))}
+              />
+            </div>
 
             <Group grow align="flex-start">
               <TextInput
