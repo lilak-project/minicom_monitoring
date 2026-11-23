@@ -5,6 +5,7 @@ import { Terminal } from "lucide-react"
 
 import { useConsole } from "@/hooks/use-console"
 import { formatClock } from "@/lib/time"
+import { paint } from "@/lib/paint"
 
 /** The rate line, the one line here that becomes a number on the chart. */
 const RATE_MARK = ">>>"
@@ -98,7 +99,7 @@ export function ConsolePanel({ sourceId, name }: { sourceId: string; name: strin
                 className={line.text.includes(RATE_MARK) ? "console-line is-rate" : "console-line"}
               >
                 <span className="console-time">{formatClock(line.at)}</span>
-                <span>{line.text}</span>
+                <span>{paint(line.text)}</span>
               </div>
             ))
           )}

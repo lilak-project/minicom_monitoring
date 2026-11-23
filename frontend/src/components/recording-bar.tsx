@@ -13,15 +13,12 @@ import type { SourceSnapshot } from "@/lib/types"
  * Whether this console is being written to a file, and which run it is.
  *
  * Recording is separate from reading. The chart and the console scrollback run
- * whenever the console is open; this bar is only about the file. Opening a
- * console starts a recording, because on a shift the failure that costs
- * something is forgetting to press record — but it can be stopped, and the
- * chart carries on regardless, so stopping is cheap.
+ * whenever the console is open; this bar is only about the file.
  *
- * **New run** is the button that gets used: it closes the current file and
- * opens the next number in one step, which is what starting a new run on the
- * DAQ means here. The number box is for making this service's numbering agree
- * with the DAQ's when they drift apart.
+ * A run is one for every console: Record, New run and Stop here do the same as
+ * on the All tab, for every open console at once, so all of them land in files
+ * with the same run number. A console opened during a run joins it. The number
+ * box is for making this service's numbering agree with the DAQ's.
  */
 export function RecordingBar({
   source,
@@ -43,7 +40,7 @@ export function RecordingBar({
     void act(
       `rec:${source.id}`,
       async () => {
-        const started = await api.startRecording(source.id, next.trim())
+        const started = await api.startRun(next.trim())
         setLabel("")
         onChanged()
         return started
@@ -55,7 +52,7 @@ export function RecordingBar({
     void act(
       `rec:${source.id}`,
       async () => {
-        await api.stopRecording(source.id)
+        await api.stopRun()
         onChanged()
       },
       rec ? `Stopped run ${rec.run}` : "Stopped recording",
@@ -116,7 +113,7 @@ export function RecordingBar({
           {control ? (
             rec ? (
               <>
-                <Tooltip label={`Close run ${rec.run} and open run ${editing ?? nextRun}`}>
+                <Tooltip label={`Close run ${rec.run} and open run ${editing ?? nextRun}, on every open console`}>
                   <Button variant="default" leftSection={<StepForward size={15} />} loading={busy} onClick={() => start(settle())}>
                     New run
                   </Button>
@@ -126,7 +123,7 @@ export function RecordingBar({
                 </Button>
               </>
             ) : (
-              <Tooltip label={open ? `Write to run ${editing ?? nextRun}` : "Open the console first — there is nothing to record"}>
+              <Tooltip label={open ? `Record run ${editing ?? nextRun} on every open console` : "Open the console first — there is nothing to record"}>
                 <div>
                   <Button
                     variant="default"

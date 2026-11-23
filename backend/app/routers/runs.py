@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from .. import csvlog, runs
 from ..parser import CSV_FIELDS
 from ..schemas import RecordingRequest
+from ..monitor import monitor
 from ._helpers import find_source, run_io
 
 router = APIRouter(prefix="/api", tags=["runs"])
@@ -33,6 +34,24 @@ async def stop_recording(source_id: str) -> dict:
     if entry is None:
         raise HTTPException(status_code=409, detail="This console is not recording.")
     return entry.as_dict()
+
+
+@router.post("/run/start")
+async def start_run(request: RecordingRequest) -> dict:
+    """Start a run: every open console records to the same run number."""
+    try:
+        return await run_io(monitor.start_run, request.run or None, request.note)
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
+
+
+@router.post("/run/stop")
+async def stop_run() -> dict:
+    """End the run: every console stops recording and keeps reading."""
+    ended = await run_io(monitor.stop_run)
+    if ended is None:
+        raise HTTPException(status_code=409, detail="No run is going.")
+    return ended
 
 
 @router.get("/runs")

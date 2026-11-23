@@ -72,6 +72,8 @@ export interface SourceSnapshot {
   recording: RunEntry | null
   /** What an unnumbered new run would be called: one past the highest taken. */
   next_run: string
+  /** The run every open console records to, or null between runs. */
+  current_run: { run: string; note: string; started_at: number } | null
   held_by: Holder[]
 }
 

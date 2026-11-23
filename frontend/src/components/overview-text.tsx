@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react"
 import { useConsole } from "@/hooks/use-console"
 import { formatClock } from "@/lib/time"
 import type { SourceSnapshot } from "@/lib/types"
+import { paint } from "@/lib/paint"
 
 /** Lines a card keeps; it shows the newest that fit and scrolls for the rest. */
 const KEEP = 200
@@ -54,7 +55,7 @@ export function TextCard({
           shown.map((line) => (
             <div key={line.seq} className={line.text.includes(">>>") ? "console-line is-rate" : "console-line"}>
               <span className="console-time">{formatClock(line.at)}</span>
-              <span>{line.text}</span>
+              <span>{paint(line.text)}</span>
             </div>
           ))
         )}

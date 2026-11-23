@@ -122,6 +122,11 @@ export const api = {
     }),
 
   /** Close the run file.  The console keeps reading and charting. */
+  startRun: (run = "", note = "") =>
+    request<{ run: string; note: string; started_at: number }>(`/api/run/start`, { method: "POST", ...json({ run, note }) }),
+
+  stopRun: () => request<{ run: string }>(`/api/run/stop`, { method: "POST" }),
+
   stopRecording: (id: string) =>
     request<RunEntry>(`/api/sources/${encodeURIComponent(id)}/recording/stop`, {
       method: "POST",

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 
+import json
 import logging
 import os
 import statistics
@@ -26,11 +27,14 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
-from .config import CONSOLE_LIMIT, DEFAULT_BAUD, DEFAULT_MAX_POINTS
+from .config import CONSOLE_LIMIT, DATA_DIR, DEFAULT_BAUD, DEFAULT_MAX_POINTS
 from .csvlog import RateLog, run_path
 from .parser import CHANNELS, CHANNEL_BY_KEY, PRIMARY, RATE_MARK_RE, clean, parse_rate_line
 from . import portlock, reader, runs
 from .series import Buffer, decimate
+
+#: The run going across every console; see Monitor.run.
+RUN_FILE = DATA_DIR / "run.json"
 
 def board_message(text: str) -> str:
     """A console line as a message: the board frames its words in dashes, the words are the information."""
@@ -186,9 +190,9 @@ class Source:
         self._thread = threading.Thread(target=self._run, name=f"read-{self.spec.id}", daemon=True)
         self._thread.start()
         try:
-            # Opening a console starts recording it. On a shift the failure that
-            # costs something is forgetting to press record, not an extra file.
-            self.start_recording()
+            # A console opened during a run joins it; between runs it only reads.
+            if monitor.run:
+                self.start_recording(monitor.run["run"], monitor.run["note"])
         except (OSError, ValueError) as err:
             # Reading is the half somebody is watching; a console that cannot
             # be written to must still appear on the chart.
@@ -463,6 +467,7 @@ class Source:
             "channels": channels,
             "recording": self.recording.as_dict() if self.recording else None,
             "next_run": runs.index.next_label(),
+            "current_run": monitor.run,
             "held_by": self.holders(),
         }
 
@@ -525,6 +530,12 @@ class Monitor:
         self._sources: dict[str, Source] = {}
         self._lock = threading.Lock()
         self.started_at = time.time()
+        #: The run going, if any: {run, note, started_at}. Kept on disk so a
+        #: restarted service puts reopened consoles back into the same run.
+        try:
+            self.run: dict | None = json.loads(RUN_FILE.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            self.run = None
 
     # -- registry --------------------------------------------------------
 
@@ -573,6 +584,30 @@ class Monitor:
                 self.add(spec)
             except ValueError as err:
                 log.warning("ignoring stored source %s: %s", spec.id, err)
+
+    # -- the run: one recording across every open console -----------------
+
+    def start_run(self, label: str | None = None, note: str = "") -> dict:
+        """Close whatever run was going and record every open console to the next one."""
+        self.stop_run()
+        text = runs.safe_run_label(label) if label else runs.index.next_label()
+        self.run = {"run": text, "note": note.strip()[:200], "started_at": time.time()}
+        RUN_FILE.parent.mkdir(parents=True, exist_ok=True)
+        RUN_FILE.write_text(json.dumps(self.run), encoding="utf-8")
+        for source in self.sources():
+            if source.reading:
+                try:
+                    source.start_recording(text, note)
+                except (OSError, ValueError) as err:
+                    source.last_error = f"not recording: {err}"
+        return self.run
+
+    def stop_run(self) -> dict | None:
+        ended, self.run = self.run, None
+        RUN_FILE.unlink(missing_ok=True)
+        for source in self.sources():
+            source.stop_recording()
+        return ended
 
     def stop_all(self) -> None:
         for source in self.sources():

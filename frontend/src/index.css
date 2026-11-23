@@ -6,9 +6,14 @@
 /* The All tab's trend is the tile's background: from under the head to the foot,
    faint, so the numbers stay the thing read. */
 .mc-overview .neon-tile .neon-spark { top: 28px; bottom: 0; height: auto; opacity: .45; }
-/* The board's routine messages, lit in the normal colour. */
-.mc-routine { color: var(--neon-ok); }
-.neon-tile.tone-alarm .mc-routine { color: inherit; }
+/* the number grows with the card: 36px on a narrow card, up to 52px on a wide screen */
+.mc-overview .neon-tile-value { font-size: clamp(36px, 12cqw, 52px); }
+/* The board's two routine messages: waiting for a trigger in cyan, the heartbeat
+   in yellow (TONG's reserve colour, a third hue by choice: told apart, not a warning). */
+.mc-msg-wait { color: var(--neon-cyan); }
+.mc-msg-beat { color: #ffd23f; }
+:root[data-neon-theme="bright"] .mc-msg-beat { color: #b58900; }
+.neon-tile.tone-alarm .mc-msg-wait, .neon-tile.tone-alarm .mc-msg-beat { color: inherit; }
 /* The All tab's text mode: each console's own lines, two rows of cards fill the screen. */
 .mc-textgrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .mc-textcard { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--neon-line); background: var(--neon-panel); }

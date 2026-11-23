@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Choice, Command, Empty, Hold, Spacer, TileGrid, Tile, type Tone } from "@neon"
+import { Choice, Command, Empty, Hold, Spacer, Tag, TileGrid, Tile, type Tone } from "@neon"
 
 import { TextCard } from "@/components/overview-text"
 
@@ -9,22 +9,11 @@ import { formatAgo } from "@/lib/time"
 import { useAction } from "@/hooks/use-action"
 import { api } from "@/lib/api"
 import type { ChannelKey, SourceSnapshot } from "@/lib/types"
+import { paint } from "@/lib/paint"
 
-/** The board's routine messages, lit so they read at a glance among the others. */
-const ROUTINE = /^(waiting for interrupt|sending heart ?beat)$/i
-
+/** The board's last message(s), its routine ones in their colours. */
 function Said({ text }: { text: string }) {
-  const parts = text.split(" · ")
-  return (
-    <>
-      {parts.map((part, i) => (
-        <span key={i}>
-          {i ? " · " : ""}
-          <span className={ROUTINE.test(part.trim()) ? "mc-routine" : undefined}>{part}</span>
-        </span>
-      ))}
-    </>
-  )
+  return <>{paint(text)}</>
 }
 
 /** Tile sizes, smallest first; the default (1) puts eight on one screen. Each
@@ -109,6 +98,20 @@ export function OverviewPanel({
       await Promise.all(sources.map((source) => api.clear(source.id)))
       onChanged()
     }, "Cleared the charts and numbers")
+  // One run across every console: the number is shared, so it is read off any of them.
+  const current = sources[0]?.current_run ?? null
+  const nextRun = sources[0]?.next_run ?? ""
+  const startRun = () =>
+    void run("run", async () => {
+      const started = await api.startRun()
+      onChanged()
+      return started
+    }, current ? `Closed run ${current.run}, recording run ${nextRun}` : `Recording run ${nextRun}`)
+  const stopRun = () =>
+    void run("run", async () => {
+      await api.stopRun()
+      onChanged()
+    }, current ? `Stopped run ${current.run}` : "Stopped")
   const pick = (next: number) => {
     setSize(next)
     try {
@@ -123,6 +126,23 @@ export function OverviewPanel({
   return (
     <>
       <div className="overview-bar">
+        {current ? <Tag label="RUN" on>{current.run}</Tag> : <Tag label="NEXT">{nextRun}</Tag>}
+        {control ? (
+          current ? (
+            <>
+              <Command small disabled={pending === "run"} onRun={startRun}>
+                New run
+              </Command>
+              <Command small confirm={`Stop run ${current.run}?`} disabled={pending === "run"} onRun={stopRun}>
+                Stop
+              </Command>
+            </>
+          ) : (
+            <Command small primary disabled={pending === "run"} onRun={startRun}>
+              Start run
+            </Command>
+          )
+        ) : null}
         {control ? (
           // Two presses: it throws away every console's chart and means at once.
           <Command small confirm={`Clear all ${sources.length}?`} disabled={pending === "clear"} onRun={clearAll}>
