@@ -32,6 +32,11 @@ from .parser import CHANNELS, CHANNEL_BY_KEY, PRIMARY, RATE_MARK_RE, clean, pars
 from . import portlock, reader, runs
 from .series import Buffer, decimate
 
+def board_message(text: str) -> str:
+    """A console line as a message: the board frames its words in dashes, the words are the information."""
+    return " · ".join(part.strip() for part in re.split(r"-{3,}", text) if part.strip())
+
+
 #: The trend behind an overview tile: the last ten minutes, at most 120 points.
 TRACE_SECONDS = 600.0
 TRACE_POINTS = 120
@@ -56,6 +61,8 @@ class SourceSpec:
     path: str = ""
     #: Re-open it when the service starts.
     autostart: bool = False
+    #: Shown as a tile in the portal's live mode.
+    live: bool = True
 
     def validate(self) -> None:
         if self.kind not in KINDS:
@@ -77,6 +84,7 @@ class SourceSpec:
         return {
             "id": self.id, "name": self.name, "kind": self.kind, "port": self.port,
             "baud": self.baud, "path": self.path, "autostart": self.autostart,
+            "live": self.live,
         }
 
     @classmethod
@@ -89,6 +97,7 @@ class SourceSpec:
             baud=int(data.get("baud", DEFAULT_BAUD)),
             path=str(data.get("path", "")),
             autostart=bool(data.get("autostart", False)),
+            live=bool(data.get("live", True)),
         )
 
 
@@ -206,6 +215,14 @@ class Source:
             if self.spec.kind == "serial":
                 lines = reader.serial_lines(self.spec.port, self.spec.baud, self._stop)
             else:
+                # What the board said last, before this was opened: to the console and
+                # the last-message line only, never the chart (they are not now).
+                try:
+                    said_at = os.path.getmtime(self.spec.path)
+                except OSError:
+                    said_at = time.time()
+                for raw in reader.capture_tail(self.spec.path):
+                    self._ingest(raw, at=said_at, history=True)
                 lines = reader.capture_lines(self.spec.path, self._stop)
             for raw in lines:
                 self._ingest(raw)
@@ -277,15 +294,26 @@ class Source:
 
     # -- ingest ----------------------------------------------------------
 
-    def _ingest(self, raw: str) -> None:
+    def _ingest(self, raw: str, at: float | None = None, history: bool = False) -> None:
         text = clean(raw)
         if not text:
             return
-        at = time.time()
+        at = time.time() if at is None else at
         with self._lock:
-            self.lines += 1
+            if not history:
+                self.lines += 1
             self.console_seq += 1
             self.console.append({"seq": self.console_seq, "at": at, "text": text})
+
+        if history:
+            # Old lines: a message may be the board's last word, but an old rate
+            # line is no sample of now.
+            if not RATE_MARK_RE.search(text):
+                info = board_message(text)
+                if info:
+                    with self._lock:
+                        self.last_info, self.last_info_at = info[:200], at
+            return
 
         sample = parse_rate_line(text, at)
         if sample is None:
@@ -294,8 +322,7 @@ class Source:
                     self.unparsed += 1
                     self.last_unparsed = text[:200]
             else:
-                # The board frames its messages in dashes; the words are the information.
-                info = " · ".join(part.strip() for part in re.split(r"-{3,}", text) if part.strip())
+                info = board_message(text)
                 if info:
                     with self._lock:
                         self.last_info, self.last_info_at = info[:200], at

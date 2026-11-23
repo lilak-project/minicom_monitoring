@@ -146,31 +146,30 @@ export function SourcePanel({
             {problem?.text ?? (reading ? "Reading the console" : "Not open")}
           </NoticeLine>
 
-          <FactGrid>
-            <Fact label="Average since opened">
+          {/* Four across, terse: the panel, the chart and some console fit one screen. */}
+          <FactGrid className="mc-facts4">
+            <Fact label="Mean since open">
               {meanChannel && source.session_mean != null
-                ? `${formatChannel("intr_per_s", source.session_mean)} intr/s over ${formatCount(source.samples)} rate lines`
-                : "no rate lines yet"}
+                ? `${formatChannel("intr_per_s", source.session_mean)} intr/s`
+                : "—"}
             </Fact>
             <Fact label="Last rate line">
               {source.last_sample_at ? formatAgo(source.last_sample_at) : "never"}
             </Fact>
             <Fact label="Console lines">
-              {formatCount(source.lines)} seen, {formatCount(source.samples)} of them rate lines
-              {source.unparsed > 0 ? `, ${formatCount(source.unparsed)} unreadable` : ""}
+              {formatCount(source.lines)} · {formatCount(source.samples)} rate
+              {source.unparsed > 0 ? ` · ${formatCount(source.unparsed)} bad` : ""}
             </Fact>
             <Fact label="Runs seen">
-              {source.runs === 0
-                ? "none"
-                : `${source.runs} — the board's trigger count restarting is what marks one`}
+              {source.runs === 0 ? "none" : source.runs}
             </Fact>
             <Fact label="Open for">
               {source.opened_at ? formatDuration(serverNow() - source.opened_at) : "—"}
             </Fact>
             <Fact label="Recording">
               {source.recording
-                ? `run ${source.recording.run} — ${formatCount(source.recording.rows)} rate lines so far`
-                : "no — the chart is live, but nothing is being written to a file"}
+                ? `run ${source.recording.run} · ${formatCount(source.recording.rows)} rows`
+                : "no"}
             </Fact>
             <Fact label="Board's run clock">{source.run_time || "—"}</Fact>
           </FactGrid>

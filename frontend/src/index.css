@@ -9,3 +9,77 @@
 /* The board's routine messages, lit in the normal colour. */
 .mc-routine { color: var(--neon-ok); }
 .neon-tile.tone-alarm .mc-routine { color: inherit; }
+/* The All tab's text mode: each console's own lines, two rows of cards fill the screen. */
+.mc-textgrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.mc-textcard { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--neon-line); background: var(--neon-panel); }
+.mc-textcard.tone-warn { box-shadow: inset 0 3px 0 var(--neon-warn); }
+.mc-textcard.tone-alarm { box-shadow: inset 4px 0 0 var(--neon-alarm); }
+.mc-textcard-head { all: unset; cursor: pointer; display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 3px 10px; font-size: var(--neon-fs-small); }
+.mc-textcard-head:hover .mc-textcard-name { color: var(--neon-accent); }
+.mc-textcard-name { flex-shrink: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-textcard-from { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--neon-dim); }
+.mc-textcard .mc-textcard-box { height: calc((100vh - 150px) / var(--mc-rows, 1) - 36px); min-height: 56px; border: 0; border-top: 1px solid var(--neon-line); font-size: 12px; line-height: 1.45; }
+.mc-textcard-error { color: var(--neon-alarm); }
+/* One console line, one row: a narrow card scrolls sideways rather than folding a rate line into five. */
+.mc-textcard-box .console-line { white-space: pre; overflow-wrap: normal; padding: 0 6px; gap: 8px; }
+/* The tabs stay on the bar's one line, beside the name and the live dot, however many
+   consoles there are: a long row scrolls sideways inside itself (wheel or trackpad),
+   with no bar of its own. Overrides NEON's "tabs drop to a second row". */
+:root .neon-top, :root .neon-top.stacked { height: 56px; flex-wrap: nowrap; padding-top: 0; row-gap: 0; }
+.neon-top .neon-tabs, .neon-top.stacked .neon-tabs, .mc-tabwrap .neon-tabs {
+  order: 0; flex: 0 1 auto; min-width: 0; height: auto; margin-top: 0;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+}
+.neon-top .neon-tabs::-webkit-scrollbar { display: none; }
+.neon-top > :not(.neon-tabs):not(.neon-spacer):not(.mc-tabwrap) { flex-shrink: 0; }
+/* Sources: one row per console. */
+.mc-srclist { display: flex; flex-direction: column; border: 1px solid var(--neon-line); }
+.mc-srcrow {
+  display: grid; align-items: center; gap: 4px 14px; padding: 6px 10px;
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) 9rem auto auto auto auto auto;
+  font-size: var(--neon-fs-small);
+}
+.mc-srcrow + .mc-srcrow { border-top: 1px solid var(--neon-line); }
+.mc-srcname { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-srcorigin { color: var(--neon-dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-srcmeta { color: var(--neon-dim); white-space: nowrap; }
+.mc-srcerr { grid-column: 1 / -1; color: var(--neon-alarm); }
+.mc-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--neon-faint); }
+.mc-dot.tone-ok { background: var(--neon-ok); }
+.mc-dot.tone-alarm { background: var(--neon-alarm); }
+/* The form being edited is lit, so an Edit press is seen to land. */
+.mc-editing > * { outline: 1px solid var(--neon-accent); outline-offset: 6px; }
+/* The All bar: Clear, the view choice and − % + all one height. */
+.overview-bar { min-height: 30px; }
+.overview-bar > .neon-command, .overview-bar > .neon-choice, .overview-bar > .neon-choice.small { height: 30px; box-sizing: border-box; }
+.overview-bar > .neon-choice .neon-choice-option, .overview-bar > .neon-choice button { height: 100%; }
+/* A console's own tab on one screen: facts four across, a shorter chart and console. */
+.fact-grid.mc-facts4 { grid-template-columns: repeat(4, max-content minmax(0, 1fr)); gap: 4px 12px; }
+@media (max-width: 60em) { .fact-grid.mc-facts4 { grid-template-columns: repeat(2, max-content minmax(0, 1fr)); } }
+/* Too many tabs for the bar: a key at the row's right end opens all of them below it. */
+.mc-tabwrap { position: relative; display: flex; align-items: stretch; flex: 0 1 auto; min-width: 0; align-self: stretch; }
+.mc-tabmore {
+  all: unset; cursor: pointer; flex: none; align-self: center; padding: 4px 10px; margin-left: 4px;
+  border: 1px solid var(--neon-line); color: var(--neon-dim); font-size: var(--neon-fs-small); white-space: nowrap;
+}
+.mc-tabmore:hover, .mc-tabmore.on { color: var(--neon-accent); border-color: var(--neon-accent); }
+.mc-tabpanel {
+  position: fixed; z-index: 50; top: 56px; left: 0; right: 0; padding: 10px var(--neon-edge);
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px;
+  background: var(--neon-panel); border-bottom: 2px solid var(--neon-accent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+}
+.mc-tabcell {
+  all: unset; cursor: pointer; display: flex; flex-direction: column; gap: 2px; padding: 6px 10px;
+  border: 1px solid var(--neon-line); background: var(--neon-raise); white-space: nowrap; overflow: hidden;
+}
+.mc-tabcell:hover { border-color: var(--neon-accent); }
+.mc-tabcell.on { border-color: var(--neon-accent); box-shadow: inset 0 -3px 0 var(--neon-accent); }
+.mc-tabcell.on .mc-tabcell-name { color: var(--neon-accent); font-weight: 600; }
+.mc-tabcell-name { overflow: hidden; text-overflow: ellipsis; }
+.mc-tabcell-state { font-size: var(--neon-fs-small); }
+/* Bright: boxes a step off the white page (the kit does panels, Paper and tiles;
+   these are minicom's own boxes). */
+:root[data-neon-theme="bright"] { --mc-box: var(--neon-zebra); }
+:root[data-neon-theme="bright"] .mc-textcard,
+:root[data-neon-theme="bright"] .mc-srclist { background: var(--mc-box); }

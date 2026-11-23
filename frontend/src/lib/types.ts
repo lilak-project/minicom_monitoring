@@ -42,6 +42,8 @@ export interface SourceSnapshot {
   baud: number
   path: string
   autostart: boolean
+  /** Shown as a tile in the portal's live mode. */
+  live: boolean
   /** The port or the path, whichever this one is. */
   origin: string
   status: "reading" | "stopped" | "error"
@@ -219,6 +221,7 @@ export interface SourceDraft {
   baud?: number
   path?: string
   autostart?: boolean
+  live?: boolean
 }
 
 /** /api/me: who is looking, and whether they may control. */

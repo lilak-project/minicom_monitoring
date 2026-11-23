@@ -18,6 +18,8 @@ class SourceRequest(BaseModel):
     baud: int = DEFAULT_BAUD
     path: str = ""
     autostart: bool = False
+    #: A tile in the portal's live mode.
+    live: bool = True
 
 
 class RecordingRequest(BaseModel):

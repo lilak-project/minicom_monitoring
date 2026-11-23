@@ -100,37 +100,42 @@ def _when(iso: str | None) -> str:
         return str(iso)[:16]
 
 
+def _num(value) -> str:
+    """The All tab's way: four significant figures, thousands grouped past 1000."""
+    if value is None:
+        return "—"
+    v = float(value)
+    return f"{v:,.0f}" if abs(v) >= 1000 else f"{v:.4g}"
+
+
 @router.get("/api/live")
 def live() -> dict:
+    """One tile per console marked for live mode -- the All tab's card: the rate
+    large, the hour behind it, data / memory and the board's last message under it."""
     items = []
     for s in monitor.snapshots():
-        chans = {c.get("key"): c for c in (s.get("channels") or [])}
-        rate = chans.get("intr_per_s") or {}
+        if not s.get("live", True):
+            continue
+        chans = {c.get("key"): c.get("value") for c in (s.get("channels") or [])}
         last_at = s.get("last_sample_at")
-        fresh = last_at is not None and (time.time() - float(last_at)) < 15
-        connected = s.get("status") == "reading"
-        mean = s.get("session_mean")
-        if isinstance(mean, dict):
-            mean = mean.get("intr_per_s")
-        now = rate.get("value")
-        sub_now = ""
-        if now is None or not fresh:
-            # Not updating: show the last logged values, and say when they were taken.
-            logged = _last_from_csv()
-            if logged:
-                if now is None:
-                    now = logged["now"]
-                if mean is None:
-                    mean = logged["mean"]
-                sub_now = f"last {_when(logged['at'])}"
-        spark = _spark(s.get("id") or "")
-        items.append({"label": "now", "value": "—" if now is None else f"{float(now):.0f}", "unit": "intr/s",
-                      "state": "running" if (connected and fresh) else "off", "sub": sub_now,
-                      "spark": spark, "spark_window": "1 h"})
-        items.append({"label": "mean", "value": "—" if mean is None else f"{float(mean):.0f}", "unit": "intr/s", "state": ""})
-        items.append({"label": "link", "value": "on" if connected else "off", "unit": "", "state": "ok" if connected else "down",
-                      "sub": (s.get("last_error") or "")[:40]})
-        break                                            # the first (active) source
+        reading = s.get("status") == "reading"
+        fresh = reading and last_at is not None and time.time() - float(last_at) < 60
+        state = "alarm" if s.get("status") == "error" else "running" if fresh else "warn" if reading else "off"
+        if reading and chans.get("intr_per_s") is not None:
+            facts = f"{_num(chans.get('mbps'))} MB/s · mem {float(chans.get('mem_pct') or 0):.2f} %"
+        else:
+            facts = (s.get("last_error") or ("closed" if not reading else "waiting"))[:60]
+        said = s.get("last_info") or ""
+        items.append({
+            "label": s.get("name") or s.get("id"),
+            "value": _num(chans.get("intr_per_s")) if reading else "—",
+            "unit": "intr/s",
+            "state": state,
+            "sub": f"{facts} · {said}" if said else facts,
+            "title": said or None,
+            "spark": _spark(s.get("id") or ""),
+            "spark_window": "1 h",
+        })
     if not items:
         logged = _last_from_csv()
         if logged:

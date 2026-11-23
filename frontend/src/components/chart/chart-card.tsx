@@ -1,7 +1,6 @@
 import { useMemo, useRef } from "react"
 import {
   Badge,
-  Divider,
   Group,
   Loader,
   Paper,
@@ -83,7 +82,7 @@ export function ChartCard({
   const zeroFloor = channelKey !== "total_intr"
 
   return (
-    <Paper withBorder p="lg" radius="lg">
+    <Paper withBorder p="sm" radius="lg">
       <Stack gap="md">
         <Group justify="space-between" align="flex-start" wrap="wrap" gap="sm">
           <Choice
@@ -195,7 +194,8 @@ export function ChartCard({
         </div>
 
         <Group gap="lg" wrap="wrap">
-          <Text size="xs" c="dimmed">
+          {/* How to steer the chart is on hover, not a line of its own (one screen). */}
+          <Text size="xs" c="dimmed" title="Drag across the chart to zoom to that interval · shift-drag to pan · double-click to go back · the wheel scrolls the page">
             {formatDuration(range.window.to - range.window.from)} shown ·{" "}
             {counts.shown === counts.total ? (
               <>every one of {formatCount(counts.total)} samples</>
@@ -217,12 +217,6 @@ export function ChartCard({
           <Loader size="xs" style={{ visibility: loading ? "visible" : "hidden" }} />
         </Group>
 
-        <Text size="xs" c="dimmed">
-          Drag across the chart to zoom to that interval · shift-drag to pan · double-click
-          to go back · the wheel scrolls the page
-        </Text>
-
-        <Divider />
 
         {/* The fine adjustment, under the thing it adjusts. */}
         <TimeBounds range={range} dataStart={dataStart} dataEnd={dataEnd} />

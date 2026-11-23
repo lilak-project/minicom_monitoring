@@ -43,7 +43,7 @@ export function ConsolePanel({ sourceId, name }: { sourceId: string; name: strin
   }
 
   return (
-    <Paper withBorder p="lg">
+    <Paper withBorder p="sm">
       <Stack gap="sm">
         <Group justify="space-between" wrap="wrap" gap="sm">
           <Group gap="xs">

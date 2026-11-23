@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
-import { Brand, Choice, Screen, Spacer, StateDot, Tabs, ThemeSwitch, type TabItem, type Tone } from "@neon"
+import { Brand, Choice, Screen, Spacer, StateDot, ThemeSwitch, type TabItem, type Tone } from "@neon"
 
 import { OverviewPanel } from "@/components/overview-panel"
 import { RunsPanel } from "@/components/runs-panel"
+import { TabsWithMore } from "@/components/tab-more"
 import { ReferencePanel } from "@/components/reference-panel"
 import { SourcePanel } from "@/components/source-panel"
 import { SourcesPanel } from "@/components/sources-panel"
@@ -122,7 +123,7 @@ export default function App() {
         <>
           {/* Monitoring is stated, not implied by missing buttons. */}
           <Brand name="minicom" readOnly={!control} />
-          <Tabs items={tabs} value={active} onChange={setRequestedTab} />
+          <TabsWithMore items={tabs} value={active} onChange={setRequestedTab} />
           <Spacer />
           {/* The socket, and this machine's clock: a clock minutes out of step
               is worth saying (times here are the server's, so the chart is
@@ -189,12 +190,11 @@ function sourceTone(source: SourceSnapshot): Tone {
   return "ok"
 }
 
-/** The current rate, short enough to sit under the name on a tab. */
+/** Under a tab's name: the rate with its unit, or one word. The run number is on the tile. */
 function sourceSummary(source: SourceSnapshot): string {
   if (source.status === "error") return "error"
-  if (source.status !== "reading") return "not open"
+  if (source.status !== "reading") return "closed"
   const rate = source.channels.find((channel) => channel.key === "intr_per_s")
-  const run = source.recording ? ` · rec ${source.recording.run}` : ""
-  if (rate?.value == null) return `no rate line yet${run}`
-  return `${formatChannel("intr_per_s", rate.value)} intr/s${run}`
+  if (rate?.value == null) return "waiting"
+  return `${formatChannel("intr_per_s", rate.value)} intr/s`
 }

@@ -106,6 +106,26 @@ def serial_lines(port: str, baud: int, stop: threading.Event) -> Iterator[str]:
         os.close(fd)
 
 
+def capture_tail(path: str, count: int = 20, size: int = 16384) -> list[str]:
+    """The last few complete lines already in a capture, read once when it is opened.
+
+    Following starts at the end (see `capture_lines`), so a board that has gone
+    quiet would otherwise say nothing at all; these lines say what it said last.
+    Missing or unreadable is simply nothing.
+    """
+    try:
+        with open(path, "rb") as handle:
+            end = handle.seek(0, os.SEEK_END)
+            handle.seek(max(0, end - size))
+            buffer = bytearray(handle.read())
+    except OSError:
+        return []
+    lines = list(_split(buffer))
+    if end > size and lines:
+        lines = lines[1:]          # the first one was cut in half by the window
+    return lines[-count:]
+
+
 def capture_lines(path: str, stop: threading.Event, from_start: bool = False) -> Iterator[str]:
     """Lines from a file that another program is appending to.
 

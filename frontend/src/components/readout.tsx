@@ -23,7 +23,7 @@ export function Readout({
 }) {
   const type = {
     md: { value: "lg", unit: "sm", label: "xs" },
-    hero: { value: "2.6rem", unit: "1.2rem", label: "sm" },
+    hero: { value: "1.9rem", unit: "1rem", label: "xs" },
   }[size]
 
   return (

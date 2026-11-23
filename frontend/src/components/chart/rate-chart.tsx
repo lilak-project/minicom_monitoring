@@ -65,7 +65,7 @@ export function RateChart({
   window,
   mean,
   zeroFloor = true,
-  height = 340,
+  height = 240,
   loading = false,
   onRange,
   onReset,

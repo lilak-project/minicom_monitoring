@@ -32,8 +32,8 @@
 }
 /* The chart's slot: its height whether it draws or explains why not; a failed
    read is laid over the top of it (NEON rule 5). */
-.mc-chartslot { position: relative; min-height: 340px; }
-.mc-chartempty { height: 340px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; }
+.mc-chartslot { position: relative; min-height: 240px; }
+.mc-chartempty { height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; }
 .mc-chartfail { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 4; padding: 8px 12px; background: var(--neon-raise); border-left: 3px solid currentColor; }
 
 /* A definition list of facts, two columns that stay aligned down the panel. */
@@ -50,7 +50,7 @@
 /* A fixed viewport onto the scrollback, not a page that grows without end:
    the chart above it must stay on screen while the console is read. */
 .console-box {
-  height: 340px; overflow: auto; padding: 8px 4px;
+  height: 200px; overflow: auto; padding: 6px 4px;
   background: var(--neon-console); color: var(--neon-console-text); border: 1px solid var(--neon-line);
   font-family: var(--mantine-font-family-monospace); font-size: var(--neon-fs-small); line-height: 1.55;
 }

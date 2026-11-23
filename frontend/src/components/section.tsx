@@ -46,8 +46,8 @@ export function Section({
  * and a value that is usually a path, a number, or a line of code -- so they
  * all get the same grid and line up down the panel.
  */
-export function FactGrid({ children }: { children: ReactNode }) {
-  return <dl className="fact-grid">{children}</dl>
+export function FactGrid({ children, className }: { children: ReactNode; className?: string }) {
+  return <dl className={className ? `fact-grid ${className}` : "fact-grid"}>{children}</dl>
 }
 
 export function Fact({

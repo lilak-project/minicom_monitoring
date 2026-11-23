@@ -91,6 +91,7 @@ async def save_source(request: SourceRequest) -> dict:
         baud=request.baud,
         path=request.path.strip(),
         autostart=request.autostart,
+        live=request.live,
     )
     try:
         monitor.add(spec)

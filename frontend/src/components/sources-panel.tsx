@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   ActionIcon,
-  Badge,
   Button,
   Group,
   Paper,
@@ -19,7 +18,7 @@ import { useAction } from "@/hooks/use-action"
 import { api } from "@/lib/api"
 import { describeHolder, formatCount } from "@/lib/format"
 import type { Reference, SerialPort, SourceKind, SourceSnapshot } from "@/lib/types"
-import { Choice, NoticeLine } from "@neon"
+import { Choice } from "@neon"
 
 /** A console being edited, before it is saved. */
 interface Draft {
@@ -30,6 +29,7 @@ interface Draft {
   baud: number
   path: string
   autostart: boolean
+  live: boolean
 }
 
 function blank(reference: Reference | null): Draft {
@@ -41,6 +41,7 @@ function blank(reference: Reference | null): Draft {
     baud: 115200,
     path: reference?.default_capture_path ?? "",
     autostart: true,
+    live: true,
   }
 }
 
@@ -97,6 +98,7 @@ export function SourcesPanel({
           baud: draft.baud,
           path: draft.path.trim(),
           autostart: draft.autostart,
+          live: draft.live,
         })
         onChanged()
         setDraft(blank(reference))
@@ -105,7 +107,11 @@ export function SourcesPanel({
       editing ? `Saved ${draft.name || "console"}` : `Added ${draft.name || "console"}`,
     )
 
+  // The form is below the list: an Edit far up a long list must bring it into view,
+  // or the press looks like it did nothing.
+  const formRef = useRef<HTMLDivElement | null>(null)
   const edit = (source: SourceSnapshot) => {
+    requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }))
     setDraft({
       id: source.id,
       name: source.name,
@@ -114,6 +120,7 @@ export function SourcesPanel({
       baud: source.baud,
       path: source.path,
       autostart: source.autostart,
+      live: source.live,
     })
     setEditing(true)
   }
@@ -133,120 +140,83 @@ export function SourcesPanel({
             None yet. Add one below — if minicom is on the port you want, use the capture file.
           </Text>
         ) : (
-          sources.map((source) => (
-            <Paper key={source.id} withBorder p="md" radius="md">
-              <Group justify="space-between" align="flex-start" wrap="wrap" gap="sm">
-                <Stack gap={4} style={{ minWidth: 0 }}>
-                  <Group gap="xs">
-                    <Text fw={600}>{source.name}</Text>
-                    <Badge
-                      size="sm"
-                      variant="light"
-                      color={source.status === "error" ? "red" : source.status === "reading" ? "teal" : "gray"}
-                    >
-                      {source.status}
-                    </Badge>
-                    <Badge size="sm" variant="default">
-                      {source.kind === "serial" ? "serial port" : "capture file"}
-                    </Badge>
-                  </Group>
-                  <Text size="sm" c="dimmed" className="tabular">
-                    {source.origin}
-                    {source.kind === "serial" ? ` · ${source.baud} 8N1` : ""}
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    {formatCount(source.samples)} rate lines seen ·{" "}
-                    {source.recording
-                      ? `recording run ${source.recording.run}`
-                      : "not recording"}
-                  </Text>
-                </Stack>
-
-                <Group gap="xs">
-                  <Switch
-                    size="sm"
-                    checked={source.autostart}
-                    label="Open on start"
-                    onChange={(event) =>
-                      void run(`autostart:${source.id}`, async () => {
-                        await api.saveSource({
-                          id: source.id,
+          // One row per console, so a bench of eight fits one screen. A problem takes
+          // a second line under its row; nothing does when all is well.
+          <div className="mc-srclist">
+            {sources.map((source) => {
+              const save = (change: { autostart?: boolean; live?: boolean }, key: string) =>
+                void run(key, async () => {
+                  await api.saveSource({
+                    id: source.id,
                           name: source.name,
                           kind: source.kind,
                           port: source.port,
                           baud: source.baud,
                           path: source.path,
-                          autostart: event.currentTarget.checked,
-                        })
-                        onChanged()
-                      })
-                    }
-                  />
+                          autostart: source.autostart,
+                          live: source.live,
+                    ...change,
+                  })
+                  onChanged()
+                })
+              return (
+                <div key={source.id} className="mc-srcrow">
+                  <span className="mc-srcname">
+                    <span className={`mc-dot tone-${source.status === "error" ? "alarm" : source.status === "reading" ? "ok" : "idle"}`} />
+                    {source.name}
+                  </span>
+                  <span className="mc-srcorigin tabular" title={source.origin}>
+                    {source.kind === "serial" ? `${source.origin} · ${source.baud}` : source.origin}
+                  </span>
+                  <span className="mc-srcmeta tabular">
+                    {formatCount(source.samples)} lines{source.recording ? ` · run ${source.recording.run}` : ""}
+                  </span>
+                  <Switch size="xs" checked={source.autostart} label="Open on start"
+                    onChange={(event) => save({ autostart: event.currentTarget.checked }, `autostart:${source.id}`)} />
+                  <Switch size="xs" checked={source.live} label="Live mode"
+                    onChange={(event) => save({ live: event.currentTarget.checked }, `live:${source.id}`)} />
                   {source.status === "reading" ? (
-                    <Button
-                      size="sm"
-                      variant="default"
-                      leftSection={<Power size={15} />}
+                    <Button size="compact-sm" variant="default" leftSection={<Power size={13} />}
                       loading={pending === `close:${source.id}`}
-                      onClick={() =>
-                        void run(`close:${source.id}`, async () => {
-                          await api.disconnect(source.id)
-                          onChanged()
-                        }, `Closed ${source.name}`)
-                      }
-                    >
+                      onClick={() => void run(`close:${source.id}`, async () => {
+                        await api.disconnect(source.id)
+                        onChanged()
+                      }, `Closed ${source.name}`)}>
                       Close
                     </Button>
                   ) : (
-                    <Button
-                      size="sm"
-                      leftSection={<Plug size={15} />}
+                    <Button size="compact-sm" leftSection={<Plug size={13} />}
                       loading={pending === `open:${source.id}`}
-                      onClick={() =>
-                        void run(`open:${source.id}`, async () => {
-                          await api.connect(source.id)
-                          onChanged()
-                        }, `Opened ${source.name}`)
-                      }
-                    >
+                      onClick={() => void run(`open:${source.id}`, async () => {
+                        await api.connect(source.id)
+                        onChanged()
+                      }, `Opened ${source.name}`)}>
                       Open
                     </Button>
                   )}
                   <Tooltip label="Edit">
-                    <ActionIcon size="lg" variant="default" onClick={() => edit(source)}>
-                      <Pencil size={16} />
+                    <ActionIcon size="md" variant="default" onClick={() => edit(source)}>
+                      <Pencil size={14} />
                     </ActionIcon>
                   </Tooltip>
                   <Tooltip label="Forget this console. The CSVs it wrote stay.">
-                    <ActionIcon
-                      size="lg"
-                      variant="default"
-                      color="red"
-                      loading={pending === `del:${source.id}`}
-                      onClick={() =>
-                        void run(`del:${source.id}`, async () => {
-                          await api.removeSource(source.id)
-                          onChanged()
-                        }, `Removed ${source.name}`)
-                      }
-                    >
-                      <Trash2 size={16} />
+                    <ActionIcon size="md" variant="default" color="red" loading={pending === `del:${source.id}`}
+                      onClick={() => void run(`del:${source.id}`, async () => {
+                        await api.removeSource(source.id)
+                        onChanged()
+                      }, `Removed ${source.name}`)}>
+                      <Trash2 size={14} />
                     </ActionIcon>
                   </Tooltip>
-                </Group>
-              </Group>
-
-              {/* One line per console, always there (rule 5). */}
-              <div style={{ marginTop: 10 }}>
-                <NoticeLine tone={source.last_error ? "alarm" : null}>
-                  {source.last_error || (source.status === "reading" ? "Reading" : "Not open")}
-                </NoticeLine>
-              </div>
-            </Paper>
-          ))
+                  {source.last_error ? <span className="mc-srcerr">{source.last_error}</span> : null}
+                </div>
+              )
+            })}
+          </div>
         )}
       </Section>
 
+      <div ref={formRef} className={editing ? "mc-editing" : undefined}>
       <Section
         title={editing ? `Edit ${draft.name || "console"}` : "Add a console"}
         description={kindSpec?.detail}
@@ -350,6 +320,7 @@ export function SourcesPanel({
           </Stack>
         </Paper>
       </Section>
+      </div>
 
       <Section
         title="Serial ports on this machine"
