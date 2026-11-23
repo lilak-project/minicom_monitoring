@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
 from starlette.types import Scope
 
-from . import csvlog, runs, store
+from . import csvlog, follow, runs, store
 from .config import STATIC_DIR
 from .monitor import monitor
 from . import access, elog
@@ -80,11 +80,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     runs.index.repair(set())
     monitor.load(store.load())
     _open_autostart()
+    follow.start()
     await status.broadcaster.start()
     try:
         yield
     finally:
         await status.broadcaster.stop()
+        follow.stop()
         # Release the serial ports, and close every CSV cleanly.
         monitor.stop_all()
 

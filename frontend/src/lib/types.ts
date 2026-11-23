@@ -73,7 +73,9 @@ export interface SourceSnapshot {
   /** What an unnumbered new run would be called: one past the highest taken. */
   next_run: string
   /** The run every open console records to, or null between runs. */
-  current_run: { run: string; note: string; started_at: number } | null
+  current_run: { run: string; note: string; started_at: number; daq: string | null } | null
+  /** Runs started and stopped by the GANIL DAQ (follow.py); error = why it cannot ask. */
+  follow_daq: { on: boolean; error: string | null }
   held_by: Holder[]
 }
 

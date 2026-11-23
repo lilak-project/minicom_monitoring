@@ -127,6 +127,8 @@ export const api = {
 
   stopRun: () => request<{ run: string }>(`/api/run/stop`, { method: "POST" }),
 
+  followDaq: (on: boolean) => request<{ on: boolean }>(`/api/run/follow?on=${on}`, { method: "POST" }),
+
   stopRecording: (id: string) =>
     request<RunEntry>(`/api/sources/${encodeURIComponent(id)}/recording/stop`, {
       method: "POST",

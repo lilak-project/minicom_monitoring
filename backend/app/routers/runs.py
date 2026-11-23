@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from .. import csvlog, runs
 from ..parser import CSV_FIELDS
 from ..schemas import RecordingRequest
+from .. import follow
 from ..monitor import monitor
 from ._helpers import find_source, run_io
 
@@ -52,6 +53,13 @@ async def stop_run() -> dict:
     if ended is None:
         raise HTTPException(status_code=409, detail="No run is going.")
     return ended
+
+
+@router.post("/run/follow")
+async def follow_daq(on: bool) -> dict:
+    """Follow the GANIL DAQ's runs (on) or start and stop by hand (off)."""
+    follow.set_on(on)
+    return {"on": follow.on()}
 
 
 @router.get("/runs")

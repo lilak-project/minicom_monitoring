@@ -112,6 +112,12 @@ export function OverviewPanel({
       await api.stopRun()
       onChanged()
     }, current ? `Stopped run ${current.run}` : "Stopped")
+  const follow = sources[0]?.follow_daq ?? { on: false, error: null }
+  const toggleFollow = () =>
+    void run("run", async () => {
+      await api.followDaq(!follow.on)
+      onChanged()
+    }, follow.on ? "Runs are started by hand" : "Following the DAQ's runs")
   const pick = (next: number) => {
     setSize(next)
     try {
@@ -128,12 +134,22 @@ export function OverviewPanel({
       <div className="overview-bar">
         {current ? <Tag label="RUN" on>{current.run}</Tag> : <Tag label="NEXT">{nextRun}</Tag>}
         {control ? (
+          <Command small on={follow.on} disabled={pending === "run"} onRun={toggleFollow}>
+            Follow DAQ
+          </Command>
+        ) : follow.on ? (
+          <span className="faint">follows DAQ</span>
+        ) : null}
+        {follow.on && follow.error ? (
+          <span className="mc-followerr" title={follow.error}>DAQ not answering</span>
+        ) : null}
+        {control && !follow.on ? (
           current ? (
             <>
-              <Command small disabled={pending === "run"} onRun={startRun}>
+              <Command small primary disabled={pending === "run"} onRun={startRun}>
                 New run
               </Command>
-              <Command small confirm={`Stop run ${current.run}?`} disabled={pending === "run"} onRun={stopRun}>
+              <Command small danger confirm={`Stop run ${current.run}?`} disabled={pending === "run"} onRun={stopRun}>
                 Stop
               </Command>
             </>

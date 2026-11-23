@@ -88,3 +88,6 @@
 :root[data-neon-theme="bright"] { --mc-box: var(--neon-zebra); }
 :root[data-neon-theme="bright"] .mc-textcard,
 :root[data-neon-theme="bright"] .mc-srclist { background: var(--mc-box); }
+
+/* Follow DAQ on, but ganil_daq_monitoring not answering: the run is held as it was. */
+.mc-followerr { color: var(--neon-pink); font-size: var(--neon-fs-small); white-space: nowrap; }

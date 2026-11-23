@@ -176,7 +176,8 @@ export function SourcePanel({
         </div>
       </Panel>
 
-      <RecordingBar source={source} control={control} onChanged={onChanged} />
+      {/* Following the DAQ, the DAQ starts and stops runs: no hand buttons to fight it. */}
+      <RecordingBar source={source} control={control && !source.follow_daq?.on} onChanged={onChanged} />
 
       <ChartCard
         channel={channel}

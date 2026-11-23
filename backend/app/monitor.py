@@ -468,6 +468,7 @@ class Source:
             "recording": self.recording.as_dict() if self.recording else None,
             "next_run": runs.index.next_label(),
             "current_run": monitor.run,
+            "follow_daq": _follow_state(),
             "held_by": self.holders(),
         }
 
@@ -521,6 +522,12 @@ def slug(name: str, taken: set[str]) -> str:
         if candidate not in taken:
             return candidate
     raise ValueError("too many sources with that name")
+
+
+def _follow_state() -> dict:
+    from . import follow  # follow imports this module
+
+    return {"on": follow.on(), "error": follow.state["error"]}
 
 
 class Monitor:
@@ -587,11 +594,13 @@ class Monitor:
 
     # -- the run: one recording across every open console -----------------
 
-    def start_run(self, label: str | None = None, note: str = "") -> dict:
-        """Close whatever run was going and record every open console to the next one."""
+    def start_run(self, label: str | None = None, note: str = "", daq: str | None = None) -> dict:
+        """Close whatever run was going and record every open console to the next one.
+
+        `daq` names the DAQ run this one follows (see follow.py); None when started by hand."""
         self.stop_run()
         text = runs.safe_run_label(label) if label else runs.index.next_label()
-        self.run = {"run": text, "note": note.strip()[:200], "started_at": time.time()}
+        self.run = {"run": text, "note": note.strip()[:200], "started_at": time.time(), "daq": daq}
         RUN_FILE.parent.mkdir(parents=True, exist_ok=True)
         RUN_FILE.write_text(json.dumps(self.run), encoding="utf-8")
         for source in self.sources():
