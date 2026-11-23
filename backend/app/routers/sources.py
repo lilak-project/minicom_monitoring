@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter, HTTPException
 
 from .. import ports as ports_module
@@ -78,9 +80,12 @@ async def reference() -> dict:
 @router.put("/sources")
 async def save_source(request: SourceRequest) -> dict:
     """Add a console, or edit one.  Does not open it."""
+    origin = (request.port if request.kind == "serial" else request.path).strip()
+    # No name given: the file's (or port's) own name, extension dropped -- cobo3.cap is "cobo3".
+    name = request.name.strip() or os.path.splitext(os.path.basename(origin))[0] or origin
     spec = SourceSpec(
         id=request.id.strip(),
-        name=request.name.strip(),
+        name=name[:60],
         kind=request.kind,
         port=request.port.strip(),
         baud=request.baud,
@@ -110,6 +115,14 @@ async def connect(source_id: str) -> dict:
     except (RuntimeError, ValueError, OSError) as err:
         # Verbatim: the message names the port, or the process holding it.
         raise HTTPException(status_code=409, detail=str(err)) from err
+    return source.snapshot()
+
+
+@router.post("/sources/{source_id}/clear")
+async def clear(source_id: str) -> dict:
+    """Empty the chart and reset the counts and means (control only, like every write)."""
+    source = find_source(source_id)
+    await run_io(source.clear)
     return source.snapshot()
 
 

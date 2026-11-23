@@ -53,6 +53,11 @@ export interface SourceSnapshot {
   /** Lines that said they were rate lines and did not parse.  Should be 0. */
   unparsed: number
   last_unparsed: string | null
+  /** The newest console line that is not a rate line, dashes dropped. */
+  last_info: string | null
+  last_info_at: number | null
+  /** The trigger rate over the last ten minutes, a few points: an overview tile's trend. */
+  trace: number[]
   /** Times the board's trigger count went backwards, i.e. a run started. */
   runs: number
   /** Mean trigger rate over everything heard since this console was opened. */

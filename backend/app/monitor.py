@@ -15,6 +15,8 @@ happened to be kept is not the average of anything.
 
 from __future__ import annotations
 
+import re
+
 import logging
 import os
 import statistics
@@ -29,6 +31,10 @@ from .csvlog import RateLog, run_path
 from .parser import CHANNELS, CHANNEL_BY_KEY, PRIMARY, RATE_MARK_RE, clean, parse_rate_line
 from . import portlock, reader, runs
 from .series import Buffer, decimate
+
+#: The trend behind an overview tile: the last ten minutes, at most 120 points.
+TRACE_SECONDS = 600.0
+TRACE_POINTS = 120
 
 log = logging.getLogger(__name__)
 
@@ -110,6 +116,10 @@ class Source:
     #: that stops matching must say so rather than look like a quiet board.
     unparsed: int = 0
     last_unparsed: str | None = None
+    #: The newest line that is not a rate line ("Waiting for interrupt", "Sending heart
+    #: beat"): what the board last said, beside what it last counted.
+    last_info: str | None = None
+    last_info_at: float | None = None
     latest: dict | None = None
     #: Sums kept as they arrive, so the session mean is not a re-scan of the
     #: whole buffer every time the status socket ticks.
@@ -283,6 +293,12 @@ class Source:
                 with self._lock:
                     self.unparsed += 1
                     self.last_unparsed = text[:200]
+            else:
+                # The board frames its messages in dashes; the words are the information.
+                info = " · ".join(part.strip() for part in re.split(r"-{3,}", text) if part.strip())
+                if info:
+                    with self._lock:
+                        self.last_info, self.last_info_at = info[:200], at
             return
 
         for channel in CHANNELS:
@@ -324,6 +340,27 @@ class Source:
             self._held = portlock.holders(self.spec.port)
             self._held_at = now
         return self._held
+
+    def clear(self) -> None:
+        """Start the chart and the numbers over: every buffer emptied, every count and
+        mean back to nothing. The console text, the board's last message and a run
+        file being written are left as they are -- a CSV is a record, not a statistic."""
+        for buffer in self.buffers.values():
+            buffer.clear()
+        with self._lock:
+            self.lines = self.samples = self.unparsed = self.runs = 0
+            self.last_unparsed = None
+            self._sum = 0.0
+            self._last_total = None
+            self.latest = None
+            if self.reading:
+                self.opened_at = time.time()      # "since opened" now reads "since cleared"
+
+    def trace(self, seconds: float = TRACE_SECONDS, points: int = TRACE_POINTS) -> list[float]:
+        """The trigger rate over the last few minutes, small enough to ride on every
+        status frame: what a tile draws behind its number."""
+        times, values = self.buffers[PRIMARY.key].window(time.time() - seconds, None)
+        return decimate(times, values, points)[1]
 
     @property
     def session_mean(self) -> float | None:
@@ -388,11 +425,14 @@ class Source:
             "samples": self.samples,
             "unparsed": self.unparsed,
             "last_unparsed": self.last_unparsed,
+            "last_info": self.last_info,
+            "last_info_at": self.last_info_at,
             "runs": self.runs,
             "session_mean": self.session_mean,
             "run_time": latest["run_time"] if latest else None,
             "run_time_seconds": latest["run_time_seconds"] if latest else None,
             "last_sample_at": latest["at"] if latest else None,
+            "trace": self.trace(),
             "channels": channels,
             "recording": self.recording.as_dict() if self.recording else None,
             "next_run": runs.index.next_label(),

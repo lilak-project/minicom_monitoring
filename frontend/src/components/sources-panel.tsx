@@ -102,7 +102,7 @@ export function SourcesPanel({
         setDraft(blank(reference))
         setEditing(false)
       },
-      editing ? `Saved ${draft.name}` : `Added ${draft.name}`,
+      editing ? `Saved ${draft.name || "console"}` : `Added ${draft.name || "console"}`,
     )
 
   const edit = (source: SourceSnapshot) => {
@@ -120,7 +120,7 @@ export function SourcesPanel({
 
   const kindSpec = reference?.kinds.find((kind) => kind.id === draft.kind)
   const complete =
-    draft.name.trim() !== "" && (draft.kind === "serial" ? draft.port !== "" : draft.path.trim() !== "")
+    (draft.kind === "serial" ? draft.port !== "" : draft.path.trim() !== "")
 
   return (
     <Stack gap="xl">
@@ -278,7 +278,7 @@ export function SourcesPanel({
             <Group grow align="flex-start">
               <TextInput
                 label="Name"
-                placeholder="CoBo 1"
+                placeholder="the file's name if empty"
                 value={draft.name}
                 onChange={(event) => setDraft({ ...draft, name: event.currentTarget.value })}
               />

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { Brand, Choice, Screen, Spacer, StateDot, Tabs, ThemeSwitch, type TabItem, type Tone } from "@neon"
 
+import { OverviewPanel } from "@/components/overview-panel"
 import { RunsPanel } from "@/components/runs-panel"
 import { ReferencePanel } from "@/components/reference-panel"
 import { SourcePanel } from "@/components/source-panel"
@@ -15,6 +16,8 @@ import type { Me, Reference, SourceSnapshot } from "@/lib/types"
 
 /** The three tabs that are always there, whatever is open. */
 const SOURCES_TAB = "sources"
+/** Every console as one tile, when there is more than one. */
+const ALL_TAB = "all"
 const RUNS_TAB = "runs"
 const REFERENCE_TAB = "reference"
 
@@ -71,14 +74,18 @@ export default function App() {
   // this page on a shift is a question about the run in progress, and a closed
   // console that happens to sort first is not an answer to it.
   const first = sources.find((source) => source.status === "reading") ?? sources[0]
+  const many = sources.length > 1
   const active =
     requestedTab &&
     ((control && requestedTab === SOURCES_TAB) ||
+      (many && requestedTab === ALL_TAB) ||
       requestedTab === RUNS_TAB ||
       requestedTab === REFERENCE_TAB ||
       ids.includes(requestedTab))
       ? requestedTab
-      : (first?.id ?? (control ? SOURCES_TAB : RUNS_TAB))
+      : many
+        ? ALL_TAB
+        : (first?.id ?? (control ? SOURCES_TAB : RUNS_TAB))
 
   const open = (source: SourceSnapshot) =>
     void run(`open:${source.id}`, async () => {
@@ -97,6 +104,7 @@ export default function App() {
 
   const tabs: TabItem[] = [
     ...(control ? [{ value: SOURCES_TAB, label: "Sources" }] : []),
+    ...(many ? [{ value: ALL_TAB, label: "All" }] : []),
     ...sources.map((source) => ({
       value: source.id,
       label: source.name,
@@ -142,7 +150,9 @@ export default function App() {
         </>
       }
     >
-      {active === REFERENCE_TAB ? (
+      {active === ALL_TAB ? (
+        <OverviewPanel sources={sources} tone={sourceTone} onPick={setRequestedTab} control={control} onChanged={refresh} />
+      ) : active === REFERENCE_TAB ? (
         <ReferencePanel reference={reference} />
       ) : active === RUNS_TAB ? (
         <RunsPanel />

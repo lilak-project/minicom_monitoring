@@ -93,6 +93,10 @@ export const api = {
   connect: (id: string) =>
     request<SourceSnapshot>(`/api/sources/${encodeURIComponent(id)}/connect`, { method: "POST" }),
 
+  /** Empty the chart and reset the counts and means. */
+  clear: (id: string) =>
+    request<SourceSnapshot>(`/api/sources/${encodeURIComponent(id)}/clear`, { method: "POST" }),
+
   disconnect: (id: string) =>
     request<SourceSnapshot>(`/api/sources/${encodeURIComponent(id)}/disconnect`, { method: "POST" }),
 

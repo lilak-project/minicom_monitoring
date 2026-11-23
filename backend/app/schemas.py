@@ -11,7 +11,8 @@ class SourceRequest(BaseModel):
     """A console to watch: a serial port, or a file minicom is writing."""
 
     id: str = ""
-    name: str = Field(..., min_length=1, max_length=60)
+    #: Empty = named after the file (or port) it reads.
+    name: str = Field("", max_length=60)
     kind: str = "serial"
     port: str = ""
     baud: int = DEFAULT_BAUD

@@ -1,2 +1,11 @@
 @import "@fontsource-variable/geist-mono";
 @import "uplot/dist/uPlot.min.css";
+
+/* The All tab's size keys: one quiet row above the tiles, always there. */
+.overview-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: var(--neon-fs-small); color: var(--neon-dim); }
+/* The All tab's trend is the tile's background: from under the head to the foot,
+   faint, so the numbers stay the thing read. */
+.mc-overview .neon-tile .neon-spark { top: 28px; bottom: 0; height: auto; opacity: .45; }
+/* The board's routine messages, lit in the normal colour. */
+.mc-routine { color: var(--neon-ok); }
+.neon-tile.tone-alarm .mc-routine { color: inherit; }
