@@ -527,7 +527,7 @@ def slug(name: str, taken: set[str]) -> str:
 def _follow_state() -> dict:
     from . import follow  # follow imports this module
 
-    return {"on": follow.on(), "error": follow.state["error"]}
+    return {"on": follow.on(), "error": follow.state["error"], "daq": follow.state["daq"]}
 
 
 class Monitor:

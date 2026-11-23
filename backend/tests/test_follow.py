@@ -28,4 +28,6 @@ calls.clear()
 monitor.run = {"run": "9", "daq": None}  # started by hand
 follow.apply(None)
 assert calls == [], calls
+s = follow.summary({"live": None, "daq_up": True, "processes": [{"label": "a", "running": True}, {"label": "b", "running": False}]})
+assert s["down"] == ["b"] and s["components"] == 2 and s["daq_up"], s
 print("ok")

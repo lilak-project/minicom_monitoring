@@ -4,11 +4,11 @@ import { Choice, Command, Empty, Hold, Spacer, Tag, TileGrid, Tile, type Tone } 
 import { TextCard } from "@/components/overview-text"
 
 import { now as serverNow } from "@/lib/clock"
-import { formatChannel } from "@/lib/format"
-import { formatAgo } from "@/lib/time"
+import { formatBytes, formatChannel } from "@/lib/format"
+import { formatAgo, formatDuration } from "@/lib/time"
 import { useAction } from "@/hooks/use-action"
 import { api } from "@/lib/api"
-import type { ChannelKey, SourceSnapshot } from "@/lib/types"
+import type { ChannelKey, DaqSummary, SourceSnapshot } from "@/lib/types"
 import { paint } from "@/lib/paint"
 
 /** The board's last message(s), its routine ones in their colours. */
@@ -112,7 +112,6 @@ export function OverviewPanel({
       await api.stopRun()
       onChanged()
     }, current ? `Stopped run ${current.run}` : "Stopped")
-  const follow = sources[0]?.follow_daq ?? { on: false, error: null }
   const toggleFollow = () =>
     void run("run", async () => {
       await api.followDaq(!follow.on)
@@ -128,7 +127,8 @@ export function OverviewPanel({
   }
   if (sources.length === 0) return <Empty>No consoles yet</Empty>
   const scale = SIZES[size]
-  const columns = Math.min(Math.round(4 / scale), sources.length)
+  const follow = sources[0]?.follow_daq ?? { on: false, error: null, daq: null }
+  const columns = Math.min(Math.round(4 / scale), sources.length + (follow.on ? 1 : 0))
   return (
     <>
       <div className="overview-bar">
@@ -205,6 +205,7 @@ export function OverviewPanel({
           </div>
         ) : (
         <TileGrid columns={columns} minWidth={290}>
+          {follow.on ? <DaqTile error={follow.error} daq={follow.daq} /> : null}
           {sources.map((source) => {
             const reading = source.status === "reading"
             const v = (key: ChannelKey) =>
@@ -250,5 +251,36 @@ export function OverviewPanel({
         )}
       </div>
     </>
+  )
+}
+
+/** The GANIL DAQ beside the consoles, while minicom follows its runs. */
+function DaqTile({ error, daq }: { error: string | null; daq: DaqSummary | null }) {
+  const live = daq?.live ?? null
+  const tone: Tone = error || (daq && !daq.daq_up) ? "alarm" : daq && daq.down.length ? "warn" : live ? "ok" : "idle"
+  return (
+    <Tile
+      label="GANIL DAQ"
+      tag={error ? "NO ANSWER" : !daq ? "" : live ? `RUN ${live.run}` : daq.daq_up ? "IDLE" : "DOWN"}
+      tone={tone}
+      value={live ? formatDuration(live.elapsed_s) : "—"}
+      unit={live ? "running" : undefined}
+      facts={[
+        { label: "written", value: live ? (live.storage_off ? "storage off" : formatBytes(live.size)) : "—" },
+        { label: "rate", value: daq?.rate_bytes_per_s != null ? `${formatBytes(daq.rate_bytes_per_s)}/s` : "—" },
+        { label: "components", value: daq ? `${daq.components - daq.down.length} / ${daq.components}` : "—" },
+      ]}
+      sub={
+        <span title={error ?? live?.note ?? undefined}>
+          {error
+            ? error
+            : daq && !daq.daq_up
+              ? "no DAQ process is running"
+              : daq?.down.length
+                ? `down: ${daq.down.join(", ")}`
+                : live?.note || "—"}
+        </span>
+      }
+    />
   )
 }

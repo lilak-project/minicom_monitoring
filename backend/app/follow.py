@@ -29,7 +29,8 @@ INTERVAL = float(os.environ.get("MINICOM_FOLLOW_INTERVAL", "3"))
 #: Where to ask. Default: the ganil service under the same portal, found by its .port file.
 URL = os.environ.get("MINICOM_DAQ_STATUS_URL", "")
 
-state = {"error": None}
+#: error: why the DAQ could not be asked; daq: what it last said (for the All tab's DAQ card).
+state: dict = {"error": None, "daq": None}
 
 
 def on() -> bool:
@@ -42,7 +43,7 @@ def set_on(value: bool) -> None:
         SWITCH.touch()
     else:
         SWITCH.unlink(missing_ok=True)
-        state["error"] = None
+        state["error"], state["daq"] = None, None
 
 
 def status_url() -> str:
@@ -58,9 +59,21 @@ def status_url() -> str:
     return f"http://127.0.0.1:{port}/api/status"
 
 
-def fetch_live() -> dict | None:
+def fetch_status() -> dict:
     with urllib.request.urlopen(status_url(), timeout=5) as response:
-        return json.load(response).get("live")
+        return json.load(response)
+
+
+def summary(status: dict) -> dict:
+    """The few things the DAQ card shows."""
+    processes = status.get("processes") or []
+    return {
+        "live": status.get("live"),
+        "daq_up": bool(status.get("daq_up")),
+        "rate_bytes_per_s": status.get("rate_bytes_per_s"),
+        "down": [p.get("label") for p in processes if not p.get("running")],
+        "components": len(processes),
+    }
 
 
 def apply(live: dict | None) -> None:
@@ -79,8 +92,9 @@ def _loop(stop: threading.Event) -> None:
         if not on():
             continue
         try:
-            apply(fetch_live())
-            state["error"] = None
+            status = fetch_status()
+            apply(status.get("live"))
+            state["daq"], state["error"] = summary(status), None
         except Exception as err:  # noqa: BLE001 -- unreachable DAQ must not kill the loop
             # Keep the run as it is: a DAQ monitor that blinks is not the DAQ stopping.
             if state["error"] != str(err):

@@ -75,7 +75,7 @@ export interface SourceSnapshot {
   /** The run every open console records to, or null between runs. */
   current_run: { run: string; note: string; started_at: number; daq: string | null } | null
   /** Runs started and stopped by the GANIL DAQ (follow.py); error = why it cannot ask. */
-  follow_daq: { on: boolean; error: string | null }
+  follow_daq: { on: boolean; error: string | null; daq: DaqSummary | null }
   held_by: Holder[]
 }
 
@@ -234,4 +234,13 @@ export interface Me {
   control: boolean
   /** Run without a portal: nobody to ask, so control is allowed. */
   standalone: boolean
+}
+
+/** What ganil_daq_monitoring last said, as follow.py keeps it. */
+export interface DaqSummary {
+  live: { run: number; note: string; elapsed_s: number; size: number; storage_off: boolean } | null
+  daq_up: boolean
+  rate_bytes_per_s: number | null
+  down: string[]
+  components: number
 }
